@@ -377,11 +377,15 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                 };
                 page.once('dialog', dialogHandler);
 
-                let navResult = null;
                 try {
-                    const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null);
                     await loginFrame.click('input[name="login"]');
-                    navResult = await navPromise;
+                    await new Promise(r => setTimeout(r, 1200));
+                    page.off('dialog', dialogHandler);
+
+                    const stillOnLogin = await loginFrame.evaluate(() => !!document.querySelector('input[name="uid"]')).catch(() => false);
+                    if (!stillOnLogin) {
+                        navResult = { success: true };
+                    }
                 } catch (e) {
                     loginFrame = await findLoginFrame();
                     if (!loginFrame && attempt < maxAttempts) {
