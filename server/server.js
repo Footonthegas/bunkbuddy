@@ -122,10 +122,6 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       console.error('[FALLBACK-DEBUG] Full experimental error:', expErr);
     }
   }
-      console.warn(`[FALLBACK] Experimental scraper: ${expErr.message}. Falling back to legacy Puppeteer...`);
-      console.error('[FALLBACK-DEBUG] Full experimental error:', expErr);
-    }
-  }
 
   // 3. Legacy Puppeteer Scraper (Fallback or Default)
   if (!ocrReady) {
