@@ -65,16 +65,18 @@ async function pollFor(fn, maxMs = 4000, intervalMs = 10) {
     return null;
 }
 
-async function fetchCaptchaDirect(imageSrc, frameUrl) {
+async function fetchCaptchaDirect(imageSrc, frameUrl, cookieHeader) {
     return new Promise((resolve, reject) => {
         const baseUrl = frameUrl ? new URL(frameUrl).origin + new URL(frameUrl).pathname.replace(/[^/]*$/, '') : 'https://www.imsnsit.org/imsnsit/';
         const absoluteUrl = new URL(imageSrc, baseUrl).href;
-        const req = https.get(absoluteUrl, {
-            headers: {
-                'Referer': frameUrl || 'https://www.imsnsit.org/imsnsit/student_login.php',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-        }, (res) => {
+        const headers = {
+            'Referer': frameUrl || 'https://www.imsnsit.org/imsnsit/student_login.php',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        };
+        if (cookieHeader) {
+            headers['Cookie'] = cookieHeader;
+        }
+        const req = https.get(absoluteUrl, { headers }, (res) => {
             const chunks = [];
             res.on('data', (chunk) => chunks.push(chunk));
             res.on('end', () => {
@@ -285,7 +287,9 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                         });
                         if (imgSrc) {
                             const frameUrl = loginFrame.url();
-                            return await fetchCaptchaDirect(imgSrc, frameUrl);
+                            const cookies = await page.cookies();
+                            const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+                            return await fetchCaptchaDirect(imgSrc, frameUrl, cookieHeader);
                         }
                     } catch (e) {
                         console.warn(`[FAST-SCRAPE] Direct captcha fetch failed: ${e.message}`);
