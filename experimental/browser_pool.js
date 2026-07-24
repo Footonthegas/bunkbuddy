@@ -147,7 +147,7 @@ async function submitAttendanceForm(formFrame, targetYear, targetSem) {
                 return true;
             }
             return false;
-        }, targetYear || '2025-26', targetSem || '4');
+        }, targetYear || '2026-27', targetSem || '1');
     } catch(evalErr) {
         console.warn("[FAST-SCRAPE] Form evaluate notice:", evalErr.message);
     }
@@ -176,15 +176,17 @@ async function waitForAttendanceTable(page) {
 /**
  * Experimental Blazing Fast Scraper (< 3s Target)
  */
-export async function pooledLoginAndScrape(rollNumber, password, year, semester, maxAttempts = 4) {
-    const browser = await browserPool.getBrowser();
-    const context = await browser.createBrowserContext();
-    const t0 = Date.now();
-    const el = () => `${((Date.now() - t0) / 1000).toFixed(2)}s`;
+export async function pooledLoginAndScrape(rollNumber, password, year, semester, maxAttempts = 4, maxRetries = 2) {
+    let lastError;
+    for (let retry = 0; retry <= maxRetries; retry++) {
+        const browser = await browserPool.getBrowser();
+        const context = await browser.createBrowserContext();
+        const t0 = Date.now();
+        const el = () => `${((Date.now() - t0) / 1000).toFixed(2)}s`;
 
-    try {
-        const page = await context.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        try {
+            const page = await context.newPage();
+            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
         await page.setRequestInterception(true);
         page.on('request', (req) => {
@@ -202,7 +204,7 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
         console.log(`[FAST-SCRAPE] [${el()}] Starting live scrape for ${rollNumber}...`);
 
         // ── STEP 1: Navigate to base IMS ──
-        await page.goto('https://www.imsnsit.org/imsnsit/', { waitUntil: 'domcontentloaded', timeout: 12000 });
+        await page.goto('https://www.imsnsit.org/imsnsit/', { waitUntil: 'domcontentloaded', timeout: 20000 });
         console.log(`[FAST-SCRAPE] [${el()}] Homepage loaded`);
 
         // ── STEP 2: Click Student Login link (15ms poll) ──
@@ -247,7 +249,7 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                     c.getContext('2d').drawImage(img, 0, 0);
                     return c.toDataURL('image/jpeg', 1.0).split(',')[1];
                 });
-            }, 10000, 50);
+            }, 20000, 50);
             if (!captchaBase64) throw new Error('Captcha image not found.');
 
             const captchaText = await solveCaptchaThreaded(Buffer.from(captchaBase64, 'base64'));
@@ -303,7 +305,7 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                 return { success: true, data, history, rollNumber: rollNumber.toUpperCase(), cookies, cookieJar };
             }
 
-            if (alertMsg && alertMsg.toLowerCase().includes('invalid') && !alertMsg.toLowerCase().includes('security')) {
+            if (alertMsg && alertMsg.toLowerCase().includes('invalid') && !alertMsg.toLowerCase().includes('security') && !alertMsg.toLowerCase().includes('captcha')) {
                 throw new Error('Invalid roll number or password.');
             }
 
@@ -314,11 +316,21 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
             }
         }
 
-        throw new Error('Login failed after maximum attempts.');
+        throw lastError || new Error('Login failed after maximum attempts.');
+    } catch (err) {
+        if (err.message.includes('Invalid roll number or password')) {
+            throw err;
+        }
+        lastError = err;
+        if (retry < maxRetries) {
+            console.warn(`[FAST-SCRAPE] Retry ${retry + 1}/${maxRetries}: ${err.message}`);
+            await new Promise(r => setTimeout(r, 500));
+        }
     } finally {
         await context.close().catch(() => {});
     }
 }
+throw lastError;
 
 /**
  * Fast refresh using cached cookies - no CAPTCHA needed
@@ -349,7 +361,7 @@ export async function fastRefreshWithCookies(cookies, rollNumber, year, semester
         console.log(`[FAST-REFRESH] [${el()}] Restoring session for ${rollNumber}...`);
 
         console.log(`[FAST-REFRESH] [${el()}] Navigating to attendance portal...`);
-        await page.goto('https://www.imsnsit.org/imsnsit/', { waitUntil: 'domcontentloaded', timeout: 12000 });
+        await page.goto('https://www.imsnsit.org/imsnsit/', { waitUntil: 'domcontentloaded', timeout: 20000 });
 
         if (cookies && cookies.length > 0) {
             try {
@@ -358,7 +370,7 @@ export async function fastRefreshWithCookies(cookies, rollNumber, year, semester
             } catch (cookieErr) {
                 console.warn(`[FAST-REFRESH] Cookie error: ${cookieErr.message}`);
             }
-            await page.reload({ waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
+            await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
         }
 
         console.log(`[FAST-REFRESH] [${el()}] Looking for attendance form...`);

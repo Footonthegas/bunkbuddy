@@ -56,7 +56,6 @@ async function handleLogin() {
   loginBtn.disabled = true;
   overlay.classList.add('active');
   clearTerminal();
-  console.log('[LOGIN] Starting login flow', { rollNumber, year, semester });
   
   try {
     typeLine(`[SYS] AUTHENTICATING ${rollNumber}...`);
@@ -77,9 +76,7 @@ async function handleLogin() {
       setTimeout(() => { if (!cancelled) typeLine(text); }, delay)
     );
 
-    console.log('[LOGIN] Calling login API...');
     const result = await login(rollNumber, password, year, semester);
-    console.log('[LOGIN] API result', result);
     cancelled = true;
     timers.forEach(clearTimeout);
 
@@ -118,28 +115,11 @@ async function handleLogin() {
   }
 }
 
-// Global error handler
-window.addEventListener('error', (e) => {
-  console.error('[GLOBAL] Error', e.message, 'at', e.filename, ':', e.lineno);
-});
-
-window.addEventListener('unhandledrejection', (e) => {
-  console.error('[GLOBAL] Unhandled rejection', e.reason);
-});
-
-loginBtn?.addEventListener('click', () => {
-  console.log('[LOGIN] Button clicked');
-  handleLogin();
-});
+loginBtn?.addEventListener('click', () => handleLogin());
 
 passInput?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    console.log('[LOGIN] Enter key pressed');
-    handleLogin();
-  }
+  if (e.key === 'Enter') handleLogin();
 });
-
-console.log('[LOGIN] Script loaded, button found:', !!loginBtn);
 
 // Setup auto-login functionality if credentials exist
 const session = getSession();

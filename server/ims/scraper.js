@@ -324,7 +324,7 @@ export async function scrapeStudentData(page, browser, targetYear, targetSem, ro
                           return true;
                       }
                       return false;
-                   }, targetYear || '2025-26', targetSem || '4');
+                   }, targetYear || '2026-27', targetSem || '1');
                } catch(evalErr) {
                    console.warn("[SCRAPER] Form evaluate notice:", evalErr.message);
                }

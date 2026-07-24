@@ -208,8 +208,8 @@ app.post('/api/data/refresh', async (req, res) => {
   }
 
   try {
-    const targetYear = year || session.year || '2025-26';
-    const targetSem = semester || session.semester || '4';
+    const targetYear = year || session.year || '2026-27';
+    const targetSem = semester || session.semester || '1';
     console.log(`[REFRESH] Full re-login refresh for ${session.rollNumber} [${targetYear} / Sem ${targetSem}]...`);
     
     const pwd = session.password || '';
@@ -217,16 +217,68 @@ app.post('/api/data/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Password not stored. Please log in again.' });
     }
 
-    const result = await pooledLoginAndScrape(session.rollNumber, pwd, targetYear, targetSem);
-    session.data = result.data;
-    session.history = result.history;
-    session.cookies = result.cookies || [];
-    session.year = targetYear;
-    session.semester = targetSem;
-    res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'experimental-full-refresh' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+    let result;
+    try {
+      result = await pooledLoginAndScrape(session.rollNumber, pwd, targetYear, targetSem);
+    } catch (expErr) {
+      if (expErr.message.includes('Invalid roll number or password')) {
+        return res.status(401).json({ success: false, message: 'Invalid roll number or password.' });
+      }
+      console.warn(`[FALLBACK] Experimental refresh: ${expErr.message}. Falling back to legacy Puppeteer...`);
+    }
+
+    if (result) {
+      session.data = result.data;
+      session.history = result.history;
+      session.cookies = result.cookies || [];
+      session.year = targetYear;
+      session.semester = targetSem;
+      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'experimental-full-refresh' });
+      return;
+    }
+
+    let browserToClose = null;
+    if (!ocrReady) {
+      for (let i = 0; i < 20 && !ocrReady; i++) await new Promise(r => setTimeout(r, 500));
+      if (!ocrReady) return res.status(503).json({ success: false, message: 'OCR service is starting up. Try again in a few seconds.' });
+    }
+
+    try {
+      const legacyResult = await loginToIms(session.rollNumber, pwd);
+      browserToClose = legacyResult.browser;
+
+      if (!legacyResult.success) {
+        return res.status(401).json({ success: false, message: legacyResult.message || 'Login failed.' });
+      }
+
+      const data = await scrapeStudentData(legacyResult.page, legacyResult.browser, targetYear, targetSem, session.rollNumber);
+      
+      let history = null;
+      try {
+          const studentProfile = await fetchStudentDetailedProfile(session.rollNumber, null, legacyResult.browser);
+          if (studentProfile && studentProfile.success) {
+            history = studentProfile.history;
+          }
+      } catch(e) { }
+      
+      session.data = data;
+      session.history = history;
+      session.cookies = [];
+      session.year = targetYear;
+      session.semester = targetSem;
+      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'legacy-puppeteer' });
+    } catch (err) {
+      console.error('Refresh error:', err.message);
+      const status = err.message.includes('Invalid') ? 401 : 500;
+      res.status(status).json({
+        success: false,
+        message: err.message || 'Could not connect to IMS NSUT.',
+      });
+    } finally {
+      if (browserToClose) {
+        await browserToClose.close().catch(() => {});
+      }
+    }
 });
 
 app.get('/api/holidays', (req, res) => {

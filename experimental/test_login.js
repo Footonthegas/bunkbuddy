@@ -18,7 +18,7 @@ try {
         body: JSON.stringify({
             rollNumber,
             password,
-            year: '2025-2026',
+            year: '2025-26',
             semester: '4'
         })
     });
