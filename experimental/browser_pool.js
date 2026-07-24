@@ -251,8 +251,7 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
 
                 const captchaBase64 = await pollFor(async () => {
                     try {
-                        return await page.evaluate(() => {
-                            const allFrames = [window, ...Array.from(document.querySelectorAll('iframe, frame'))];
+                        return await loginFrame.evaluate(() => {
                             const selectors = [
                                 '#captchaimg',
                                 'img[src*="captcha"]',
@@ -267,45 +266,39 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                                 'img[src*="rand"]',
                                 'img[src*="random"]'
                             ];
-                            for (const frame of allFrames) {
-                                try {
-                                    const doc = frame.document || frame.contentDocument;
-                                    if (!doc) continue;
-                                    let img = null;
-                                    for (const sel of selectors) {
-                                        img = doc.querySelector(sel);
-                                        if (img) break;
-                                    }
-                                    if (!img) {
-                                        const allImgs = doc.querySelectorAll('img');
-                                        for (const el of allImgs) {
-                                            const src = (el.src || '').toLowerCase();
-                                            if (src.includes('captcha') || src.includes('checkcode') || src.includes('security') || src.includes('rand') || src.includes('random')) {
-                                                img = el;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    if (!img) continue;
-                                    if (!img.naturalWidth && img.complete) continue;
-                                    if (!img.naturalWidth) return null;
-
-                                    if (img.src && img.src.startsWith('data:image')) {
-                                        return img.src.split(',')[1];
-                                    }
-
-                                    const scale = 3;
-                                    const canvas = doc.createElement('canvas');
-                                    canvas.width = img.naturalWidth * scale;
-                                    canvas.height = img.naturalHeight * scale;
-                                    const ctx = canvas.getContext('2d');
-                                    ctx.imageSmoothingEnabled = true;
-                                    ctx.imageSmoothingQuality = 'high';
-                                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                    return canvas.toDataURL('image/png').split(',')[1];
-                                } catch (e) {}
+                            const doc = document;
+                            let img = null;
+                            for (const sel of selectors) {
+                                img = doc.querySelector(sel);
+                                if (img) break;
                             }
-                            return null;
+                            if (!img) {
+                                const allImgs = doc.querySelectorAll('img');
+                                for (const el of allImgs) {
+                                    const src = (el.src || '').toLowerCase();
+                                    if (src.includes('captcha') || src.includes('checkcode') || src.includes('security') || src.includes('rand') || src.includes('random')) {
+                                        img = el;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!img) return null;
+                            if (!img.naturalWidth && img.complete) return null;
+                            if (!img.naturalWidth) return null;
+
+                            if (img.src && img.src.startsWith('data:image')) {
+                                return img.src.split(',')[1];
+                            }
+
+                            const scale = 3;
+                            const canvas = doc.createElement('canvas');
+                            canvas.width = img.naturalWidth * scale;
+                            canvas.height = img.naturalHeight * scale;
+                            const ctx = canvas.getContext('2d');
+                            ctx.imageSmoothingEnabled = true;
+                            ctx.imageSmoothingQuality = 'high';
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            return canvas.toDataURL('image/png').split(',')[1];
                         });
                     } catch (e) {
                         return null;
