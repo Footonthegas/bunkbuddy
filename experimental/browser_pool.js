@@ -379,9 +379,9 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
 
                 let navResult = null;
                 try {
-                    const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => null);
+                    const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null);
                     await loginFrame.click('input[name="login"]');
-                    navResult = await Promise.race([navPromise, new Promise(r => setTimeout(r, 3000))]);
+                    navResult = await navPromise;
                 } catch (e) {
                     loginFrame = await findLoginFrame();
                     if (!loginFrame && attempt < maxAttempts) {
