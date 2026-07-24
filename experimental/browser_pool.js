@@ -224,9 +224,10 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
             console.log(`[FAST-SCRAPE] [${el()}] Student Login clicked`);
 
             async function findLoginFrame() {
-                for (let i = 0; i < 60; i++) {
+                for (let i = 0; i < 120; i++) {
                     for (const frame of page.frames()) {
                         try {
+                            if (frame.isDetached()) continue;
                             const hasUid = await frame.evaluate(() => !!document.querySelector('input[name="uid"]'));
                             if (hasUid) return frame;
                         } catch (e) {}
@@ -240,10 +241,10 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
             if (!loginFrame) throw new Error('Login frame not found on IMS.');
             console.log(`[FAST-SCRAPE] [${el()}] Login frame located`);
 
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 800));
 
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                if (!loginFrame || loginFrame.isDetached()) {
+                if (!loginFrame) {
                     loginFrame = await findLoginFrame();
                     if (!loginFrame) throw new Error('Login frame lost during authentication.');
                 }
