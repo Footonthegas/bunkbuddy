@@ -1,9 +1,9 @@
 import http from 'http';
 
-const THREADED_OCR_URL = { hostname: '127.0.0.1', port: 5002 };
-const FALLBACK_OCR_URL = { hostname: '127.0.0.1', port: 5001 };
+const THREADED_OCR_URL = { hostname: '127.0.0.1', port: 5001 };
+const FALLBACK_OCR_URL = { hostname: '127.0.0.1', port: 5002 };
 
-function callOcrService(buffer, targetPort = 5002) {
+function callOcrService(buffer, targetPort = 5001) {
     return new Promise((resolve, reject) => {
         const b64 = buffer.toString('base64');
         const body = JSON.stringify({ image: b64 });
@@ -31,9 +31,8 @@ function callOcrService(buffer, targetPort = 5002) {
         });
 
         req.on('error', (err) => {
-            if (targetPort === 5002) {
-                // Try fallback to port 5001 if port 5002 isn't running yet
-                callOcrService(buffer, 5001).then(resolve).catch(reject);
+            if (targetPort === 5001) {
+                callOcrService(buffer, 5002).then(resolve).catch(reject);
             } else {
                 reject(err);
             }
