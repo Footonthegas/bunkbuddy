@@ -238,88 +238,17 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
 
         // ── STEP 4: Solve CAPTCHA & Authenticate ──
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            let captchaBase64 = null;
-            try {
-                captchaBase64 = await pollFor(async () => {
-                    return await page.evaluate(() => {
-                        const allFrames = [window, ...Array.from(document.querySelectorAll('iframe, frame'))];
-                        const selectors = [
-                            '#captchaimg',
-                            'img[src*="captcha"]',
-                            'img[src*="Captcha"]',
-                            'img[alt*="captcha"]',
-                            'img[title*="captcha"]',
-                            '.captcha img',
-                            '#captcha img',
-                            'img[src*="captchaimg"]',
-                            'img[src*="checkcode"]',
-                            'img[src*="security"]',
-                            'img[src*="rand"]',
-                            'img[src*="random"]'
-                        ];
-
-                        for (const frame of allFrames) {
-                            try {
-                                const doc = frame.document || frame.contentDocument;
-                                if (!doc) continue;
-                                let img = null;
-                                for (const sel of selectors) {
-                                    img = doc.querySelector(sel);
-                                    if (img) break;
-                                }
-                                if (!img) {
-                                    const allImgs = doc.querySelectorAll('img');
-                                    for (const el of allImgs) {
-                                        const src = (el.src || '').toLowerCase();
-                                        if (src.includes('captcha') || src.includes('checkcode') || src.includes('security') || src.includes('rand') || src.includes('random')) {
-                                            img = el;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if (!img) continue;
-                                if (!img.naturalWidth && img.complete) continue;
-                                if (!img.naturalWidth) return null;
-
-                                if (img.src && img.src.startsWith('data:image')) {
-                                    return img.src.split(',')[1];
-                                }
-
-                                const scale = 2;
-                                const canvas = doc.createElement('canvas');
-                                canvas.width = img.naturalWidth * scale;
-                                canvas.height = img.naturalHeight * scale;
-                                const ctx = canvas.getContext('2d');
-                                ctx.imageSmoothingEnabled = true;
-                                ctx.imageSmoothingQuality = 'high';
-                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                return canvas.toDataURL('image/png').split(',')[1];
-                            } catch (e) {}
-                        }
-                        return null;
-                    });
-                }, 15000, 100);
-            } catch (e) {
-                console.warn(`[FAST-SCRAPE] Captcha detection error: ${e.message}`);
-            }
-
-            if (!captchaBase64) {
-                if (attempt < maxAttempts) {
-                    console.log(`[FAST-SCRAPE] [${el()}] Captcha not found, refreshing page...`);
-                    await page.goto('https://www.imsnsit.org/imsnsit/', { waitUntil: 'domcontentloaded', timeout: 15000 });
-                    await pollFor(async () => {
-                        for (const frame of page.frames()) {
-                            try {
-                                const hasUid = await frame.evaluate(() => !!document.querySelector('input[name="uid"]'));
-                                if (hasUid) return true;
-                            } catch (e) {}
-                        }
-                        return false;
-                    }, 10000, 100);
-                    continue;
-                }
-                throw new Error('Captcha image not found.');
-            }
+            const captchaBase64 = await pollFor(async () => {
+                return await loginFrame.evaluate(() => {
+                    const img = document.querySelector('#captchaimg') || document.querySelector('img[src*="captcha"]');
+                    if (!img || !img.naturalWidth) return null;
+                    const c = document.createElement('canvas');
+                    c.width = img.naturalWidth; c.height = img.naturalHeight;
+                    c.getContext('2d').drawImage(img, 0, 0);
+                    return c.toDataURL('image/jpeg', 1.0).split(',')[1];
+                });
+            }, 10000, 50);
+            if (!captchaBase64) throw new Error('Captcha image not found.');
 
             const captchaText = await solveCaptchaThreaded(Buffer.from(captchaBase64, 'base64'));
             console.log(`[FAST-SCRAPE] [${el()}] CAPTCHA: ${captchaText}`);
