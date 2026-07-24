@@ -188,149 +188,180 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
             const page = await context.newPage();
             await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            const type = req.resourceType();
-            const url = req.url().toLowerCase();
-            if (type === 'image' && (url.includes('captcha') || url.includes('captchaimg'))) {
-                req.continue();
-            } else if (['image', 'stylesheet', 'font', 'media'].includes(type) || url.includes('google-analytics') || url.includes('ads')) {
-                req.abort();
-            } else {
-                req.continue();
-            }
-        });
+            await page.setRequestInterception(true);
+            page.on('request', (req) => {
+                const type = req.resourceType();
+                const url = req.url().toLowerCase();
+                if (type === 'image' && (url.includes('captcha') || url.includes('captchaimg'))) {
+                    req.continue();
+                } else if (['image', 'stylesheet', 'font', 'media'].includes(type) || url.includes('google-analytics') || url.includes('ads')) {
+                    req.abort();
+                } else {
+                    req.continue();
+                }
+            });
 
-        console.log(`[FAST-SCRAPE] [${el()}] Starting live scrape for ${rollNumber}...`);
+            console.log(`[FAST-SCRAPE] [${el()}] Starting live scrape for ${rollNumber}...`);
 
-        // ── STEP 1: Navigate to base IMS ──
-        await page.goto('https://www.imsnsit.org/imsnsit/', { waitUntil: 'domcontentloaded', timeout: 20000 });
-        console.log(`[FAST-SCRAPE] [${el()}] Homepage loaded`);
+            await page.goto('https://www.imsnsit.org/imsnsit/', { waitUntil: 'domcontentloaded', timeout: 20000 });
+            console.log(`[FAST-SCRAPE] [${el()}] Homepage loaded`);
 
-        // ── STEP 2: Click Student Login link (15ms poll) ──
-        const clickedLogin = await pollFor(async () => {
-            for (const frame of page.frames()) {
-                try {
-                    const found = await frame.evaluate(() => {
-                        const link = Array.from(document.querySelectorAll('a'))
-                            .find(a => a.textContent.trim().toLowerCase().includes('student login'));
-                        if (link) { link.click(); return true; }
-                        return false;
-                    });
-                    if (found) return true;
-                } catch (e) {}
-            }
-            return false;
-        }, 4000, 15);
-        if (!clickedLogin) throw new Error('Student Login link not found.');
-        console.log(`[FAST-SCRAPE] [${el()}] Student Login clicked`);
+            const clickedLogin = await pollFor(async () => {
+                for (const frame of page.frames()) {
+                    try {
+                        const found = await frame.evaluate(() => {
+                            const link = Array.from(document.querySelectorAll('a'))
+                                .find(a => a.textContent.trim().toLowerCase().includes('student login'));
+                            if (link) { link.click(); return true; }
+                            return false;
+                        });
+                        if (found) return true;
+                    } catch (e) {}
+                }
+                return false;
+            }, 4000, 15);
+            if (!clickedLogin) throw new Error('Student Login link not found.');
+            console.log(`[FAST-SCRAPE] [${el()}] Student Login clicked`);
 
-        // ── STEP 3: Locate login frame with input[name="uid"] ──
-        const loginFrame = await pollFor(async () => {
-            for (const frame of page.frames()) {
-                try {
-                    const hasUid = await frame.evaluate(() => !!document.querySelector('input[name="uid"]'));
-                    if (hasUid) return frame;
-                } catch (e) {}
-            }
-            return null;
-        }, 5000, 15);
-        if (!loginFrame) throw new Error('Login frame not found on IMS.');
-        console.log(`[FAST-SCRAPE] [${el()}] Login frame located`);
-
-        // ── STEP 4: Solve CAPTCHA & Authenticate ──
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            const captchaBase64 = await pollFor(async () => {
-                return await loginFrame.evaluate(() => {
-                    const img = document.querySelector('#captchaimg') || document.querySelector('img[src*="captcha"]');
-                    if (!img || !img.naturalWidth) return null;
-                    const c = document.createElement('canvas');
-                    c.width = img.naturalWidth; c.height = img.naturalHeight;
-                    c.getContext('2d').drawImage(img, 0, 0);
-                    return c.toDataURL('image/jpeg', 1.0).split(',')[1];
-                });
-            }, 20000, 50);
-            if (!captchaBase64) throw new Error('Captcha image not found.');
-
-            const captchaText = await solveCaptchaThreaded(Buffer.from(captchaBase64, 'base64'));
-            console.log(`[FAST-SCRAPE] [${el()}] CAPTCHA: ${captchaText}`);
-
-            // Fill credentials in single evaluate
-            await loginFrame.evaluate((u, p, c) => {
-                const uid = document.querySelector('input[name="uid"]');
-                const pwd = document.querySelector('input[name="pwd"]');
-                const cap = document.querySelector('input[name="cap"]');
-                if (uid) { uid.value = u; uid.dispatchEvent(new Event('input', {bubbles: true})); }
-                if (pwd) { pwd.value = p; pwd.dispatchEvent(new Event('input', {bubbles: true})); }
-                if (cap) { cap.value = c; cap.dispatchEvent(new Event('input', {bubbles: true})); }
-            }, rollNumber, password, captchaText);
-
-            let alertMsg = null;
-            const dialogHandler = async (dialog) => {
-                alertMsg = dialog.message();
-                console.log(`[FAST-SCRAPE] Alert: ${alertMsg}`);
-                await dialog.accept();
-            };
-            page.once('dialog', dialogHandler);
-
-            const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 4000 }).catch(() => null);
-            await loginFrame.click('input[name="login"]');
-            const navResult = await Promise.race([navPromise, new Promise(r => setTimeout(r, 600))]);
-
-            if (navResult) {
-                console.log(`[FAST-SCRAPE] [${el()}] ✅ Authenticated!`);
-
-                const cookies = await context.cookies();
-                const cookieJar = await import('tough-cookie').then(m => {
-                    const jar = new m.CookieJar();
-                    for (const c of cookies) {
-                        try { jar.setCookieSync(`${c.name}=${c.value}; Domain=${c.domain}; Path=${c.path};`); } catch(e) {}
+            async function findLoginFrame() {
+                for (let i = 0; i < 60; i++) {
+                    for (const frame of page.frames()) {
+                        try {
+                            const hasUid = await frame.evaluate(() => !!document.querySelector('input[name="uid"]'));
+                            if (hasUid) return frame;
+                        } catch (e) {}
                     }
-                    return jar;
-                }).catch(() => null);
-
-                const resultHubPromise = fetchStudentDetailedProfile(rollNumber, null, browser).catch(e => {
-                    console.warn(`[FAST-SCRAPE] ResultHub error: ${e.message}`);
-                    return { success: false, history: null };
-                });
-
-                console.log(`[FAST-SCRAPE] [${el()}] Executing live attendance extraction...`);
-                const data = await scrapeStudentData(page, browser, year, semester, rollNumber);
-                console.log(`[FAST-SCRAPE] [${el()}] Live attendance extracted (${data?.attendance?.length || 0} subjects)`);
-
-                const rhResult = await resultHubPromise;
-                const history = rhResult?.success ? rhResult.history : null;
-
-                console.log(`[FAST-SCRAPE] [${el()}] 🚀 TOTAL TIME: ${el()}`);
-                return { success: true, data, history, rollNumber: rollNumber.toUpperCase(), cookies, cookieJar };
+                    await new Promise(r => setTimeout(r, 50));
+                }
+                return null;
             }
 
-            if (alertMsg && alertMsg.toLowerCase().includes('invalid') && !alertMsg.toLowerCase().includes('security') && !alertMsg.toLowerCase().includes('captcha')) {
-                throw new Error('Invalid roll number or password.');
+            let loginFrame = await findLoginFrame();
+            if (!loginFrame) throw new Error('Login frame not found on IMS.');
+            console.log(`[FAST-SCRAPE] [${el()}] Login frame located`);
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                if (!loginFrame || loginFrame.isDetached()) {
+                    loginFrame = await findLoginFrame();
+                    if (!loginFrame) throw new Error('Login frame lost during authentication.');
+                }
+
+                const captchaBase64 = await pollFor(async () => {
+                    try {
+                        return await loginFrame.evaluate(() => {
+                            const img = document.querySelector('#captchaimg') || document.querySelector('img[src*="captcha"]');
+                            if (!img || !img.naturalWidth) return null;
+                            const c = document.createElement('canvas');
+                            c.width = img.naturalWidth; c.height = img.naturalHeight;
+                            c.getContext('2d').drawImage(img, 0, 0);
+                            return c.toDataURL('image/jpeg', 1.0).split(',')[1];
+                        });
+                    } catch (e) {
+                        return null;
+                    }
+                }, 20000, 50);
+                if (!captchaBase64) throw new Error('Captcha image not found.');
+
+                const captchaText = await solveCaptchaThreaded(Buffer.from(captchaBase64, 'base64'));
+                console.log(`[FAST-SCRAPE] [${el()}] CAPTCHA: ${captchaText}`);
+
+                try {
+                    await loginFrame.evaluate((u, p, c) => {
+                        const uid = document.querySelector('input[name="uid"]');
+                        const pwd = document.querySelector('input[name="pwd"]');
+                        const cap = document.querySelector('input[name="cap"]');
+                        if (uid) { uid.value = u; uid.dispatchEvent(new Event('input', {bubbles: true})); }
+                        if (pwd) { pwd.value = p; pwd.dispatchEvent(new Event('input', {bubbles: true})); }
+                        if (cap) { cap.value = c; cap.dispatchEvent(new Event('input', {bubbles: true})); }
+                    }, rollNumber, password, captchaText);
+                } catch (e) {
+                    loginFrame = await findLoginFrame();
+                    if (!loginFrame) throw e;
+                    continue;
+                }
+
+                let alertMsg = null;
+                const dialogHandler = async (dialog) => {
+                    alertMsg = dialog.message();
+                    console.log(`[FAST-SCRAPE] Alert: ${alertMsg}`);
+                    await dialog.accept();
+                };
+                page.once('dialog', dialogHandler);
+
+                let navResult = null;
+                try {
+                    const navPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 4000 }).catch(() => null);
+                    await loginFrame.click('input[name="login"]');
+                    navResult = await Promise.race([navPromise, new Promise(r => setTimeout(r, 600))]);
+                } catch (e) {
+                    loginFrame = await findLoginFrame();
+                    if (!loginFrame && attempt < maxAttempts) {
+                        console.log(`[FAST-SCRAPE] [${el()}] Recovering login frame...`);
+                        continue;
+                    }
+                    throw e;
+                }
+
+                if (navResult) {
+                    console.log(`[FAST-SCRAPE] [${el()}] ✅ Authenticated!`);
+
+                    const cookies = await context.cookies();
+                    const cookieJar = await import('tough-cookie').then(m => {
+                        const jar = new m.CookieJar();
+                        for (const c of cookies) {
+                            try { jar.setCookieSync(`${c.name}=${c.value}; Domain=${c.domain}; Path=${c.path};`); } catch(e) {}
+                        }
+                        return jar;
+                    }).catch(() => null);
+
+                    const resultHubPromise = fetchStudentDetailedProfile(rollNumber, null, browser).catch(e => {
+                        console.warn(`[FAST-SCRAPE] ResultHub error: ${e.message}`);
+                        return { success: false, history: null };
+                    });
+
+                    console.log(`[FAST-SCRAPE] [${el()}] Executing live attendance extraction...`);
+                    const data = await scrapeStudentData(page, browser, year, semester, rollNumber);
+                    console.log(`[FAST-SCRAPE] [${el()}] Live attendance extracted (${data?.attendance?.length || 0} subjects)`);
+
+                    const rhResult = await resultHubPromise;
+                    const history = rhResult?.success ? rhResult.history : null;
+
+                    console.log(`[FAST-SCRAPE] [${el()}] 🚀 TOTAL TIME: ${el()}`);
+                    return { success: true, data, history, rollNumber: rollNumber.toUpperCase(), cookies, cookieJar };
+                }
+
+                if (alertMsg && alertMsg.toLowerCase().includes('invalid') && !alertMsg.toLowerCase().includes('security') && !alertMsg.toLowerCase().includes('captcha')) {
+                    throw new Error('Invalid roll number or password.');
+                }
+
+                if (attempt < maxAttempts) {
+                    console.log(`[FAST-SCRAPE] [${el()}] CAPTCHA wrong. Refreshing...`);
+                    try {
+                        await loginFrame.evaluate(() => { if (typeof refreshcaptcha1 === 'function') refreshcaptcha1(); }).catch(() => {});
+                    } catch (e) {
+                        loginFrame = await findLoginFrame();
+                    }
+                    await new Promise(r => setTimeout(r, 300));
+                    loginFrame = await findLoginFrame();
+                    if (!loginFrame) throw new Error('Login frame lost after captcha refresh.');
+                }
             }
 
-            if (attempt < maxAttempts) {
-                console.log(`[FAST-SCRAPE] [${el()}] CAPTCHA wrong. Refreshing...`);
-                await loginFrame.evaluate(() => { if (typeof refreshcaptcha1 === 'function') refreshcaptcha1(); }).catch(() => {});
-                await new Promise(r => setTimeout(r, 250));
+            throw lastError || new Error('Login failed after maximum attempts.');
+        } catch (err) {
+            if (err.message.includes('Invalid roll number or password')) {
+                throw err;
             }
+            lastError = err;
+            if (retry < maxRetries) {
+                console.warn(`[FAST-SCRAPE] Retry ${retry + 1}/${maxRetries}: ${err.message}`);
+                await new Promise(r => setTimeout(r, 500));
+            }
+        } finally {
+            await context.close().catch(() => {});
         }
-
-        throw lastError || new Error('Login failed after maximum attempts.');
-    } catch (err) {
-        if (err.message.includes('Invalid roll number or password')) {
-            throw err;
-        }
-        lastError = err;
-        if (retry < maxRetries) {
-            console.warn(`[FAST-SCRAPE] Retry ${retry + 1}/${maxRetries}: ${err.message}`);
-            await new Promise(r => setTimeout(r, 500));
-        }
-    } finally {
-        await context.close().catch(() => {});
     }
-}
-throw lastError || new Error('Login failed after maximum attempts.');
+    throw lastError || new Error('Login failed after maximum attempts.');
 }
 
 /**
