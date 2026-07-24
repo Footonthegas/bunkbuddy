@@ -46,7 +46,7 @@ function callOcrService(buffer, targetPort = 5001) {
 
 export async function solveCaptchaThreaded(buffer) {
     try {
-        const raw = await callOcrService(buffer, 5002);
+        const raw = await callOcrService(buffer, 5001);
         let cleaned = raw.replace(/[^0-9]/g, '').trim();
         if (cleaned.length > 5) cleaned = cleaned.slice(0, 5);
         if (cleaned.length < 5) cleaned = cleaned.padEnd(5, '0');
