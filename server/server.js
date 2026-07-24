@@ -81,6 +81,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
   // Always perform live scrape to return latest attendance data per user request
 
   // 2. Attempt Experimental Fast Scraper if enabled
+  let experimentalError = null;
   if (enableExperimentalScraper) {
     try {
       console.log(`[LOGIN] Attempting Experimental Pooled Login+Scrape for ${rollNumber}...`);
@@ -116,7 +117,13 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       if (expErr.message.includes('Invalid roll number or password')) {
         return res.status(401).json({ success: false, message: 'Invalid roll number or password.' });
       }
+      experimentalError = expErr.message;
       console.warn(`[FALLBACK] Experimental scraper: ${expErr.message}. Falling back to legacy Puppeteer...`);
+      console.error('[FALLBACK-DEBUG] Full experimental error:', expErr);
+    }
+  }
+      console.warn(`[FALLBACK] Experimental scraper: ${expErr.message}. Falling back to legacy Puppeteer...`);
+      console.error('[FALLBACK-DEBUG] Full experimental error:', expErr);
     }
   }
 
@@ -156,7 +163,8 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       rollNumber,
       data,
       history,
-      mode: 'legacy-puppeteer'
+      mode: 'legacy-puppeteer',
+      experimentalError
     });
   } catch (err) {
     console.error('Login error:', err.message);
