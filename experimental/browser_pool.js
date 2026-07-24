@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import https from 'https';
 import { solveCaptchaThreaded } from './captcha_threaded.js';
 import { scrapeStudentData, fetchStudentDetailedProfile, parseAttendanceFromHtml } from '../server/ims/scraper.js';
 
@@ -62,6 +63,34 @@ async function pollFor(fn, maxMs = 4000, intervalMs = 10) {
         await new Promise(r => setTimeout(r, intervalMs));
     }
     return null;
+}
+
+async function fetchCaptchaDirect(imageSrc, frameUrl) {
+    return new Promise((resolve, reject) => {
+        const baseUrl = frameUrl ? new URL(frameUrl).origin + new URL(frameUrl).pathname.replace(/[^/]*$/, '') : 'https://www.imsnsit.org/imsnsit/';
+        const absoluteUrl = new URL(imageSrc, baseUrl).href;
+        const req = https.get(absoluteUrl, {
+            headers: {
+                'Referer': frameUrl || 'https://www.imsnsit.org/imsnsit/student_login.php',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        }, (res) => {
+            const chunks = [];
+            res.on('data', (chunk) => chunks.push(chunk));
+            res.on('end', () => {
+                if (res.statusCode === 200) {
+                    resolve(Buffer.concat(chunks).toString('base64'));
+                } else {
+                    reject(new Error(`HTTP ${res.statusCode}`));
+                }
+            });
+        });
+        req.on('error', reject);
+        req.setTimeout(10000, () => {
+            req.destroy();
+            reject(new Error('Direct captcha fetch timeout'));
+        });
+    });
 }
 
 async function getAttendanceFrame(page) {
@@ -249,6 +278,19 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                 }
 
                 const captchaBase64 = await pollFor(async () => {
+                    try {
+                        const imgSrc = await loginFrame.evaluate(() => {
+                            const img = document.querySelector('#captchaimg') || document.querySelector('img[src*="captcha"]');
+                            return img ? img.src : null;
+                        });
+                        if (imgSrc) {
+                            const frameUrl = loginFrame.url();
+                            return await fetchCaptchaDirect(imgSrc, frameUrl);
+                        }
+                    } catch (e) {
+                        console.warn(`[FAST-SCRAPE] Direct captcha fetch failed: ${e.message}`);
+                    }
+
                     try {
                         return await loginFrame.evaluate(() => {
                             const selectors = [
