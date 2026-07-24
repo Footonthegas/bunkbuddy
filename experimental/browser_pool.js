@@ -1,5 +1,4 @@
 import puppeteer from 'puppeteer';
-import https from 'https';
 import { solveCaptchaThreaded } from './captcha_threaded.js';
 import { scrapeStudentData, fetchStudentDetailedProfile, parseAttendanceFromHtml } from '../server/ims/scraper.js';
 
@@ -63,36 +62,6 @@ async function pollFor(fn, maxMs = 4000, intervalMs = 10) {
         await new Promise(r => setTimeout(r, intervalMs));
     }
     return null;
-}
-
-async function fetchCaptchaDirect(imageSrc, frameUrl, cookieHeader) {
-    return new Promise((resolve, reject) => {
-        const baseUrl = frameUrl ? new URL(frameUrl).origin + new URL(frameUrl).pathname.replace(/[^/]*$/, '') : 'https://www.imsnsit.org/imsnsit/';
-        const absoluteUrl = new URL(imageSrc, baseUrl).href;
-        const headers = {
-            'Referer': frameUrl || 'https://www.imsnsit.org/imsnsit/student_login.php',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        };
-        if (cookieHeader) {
-            headers['Cookie'] = cookieHeader;
-        }
-        const req = https.get(absoluteUrl, { headers }, (res) => {
-            const chunks = [];
-            res.on('data', (chunk) => chunks.push(chunk));
-            res.on('end', () => {
-                if (res.statusCode === 200) {
-                    resolve(Buffer.concat(chunks).toString('base64'));
-                } else {
-                    reject(new Error(`HTTP ${res.statusCode}`));
-                }
-            });
-        });
-        req.on('error', reject);
-        req.setTimeout(10000, () => {
-            req.destroy();
-            reject(new Error('Direct captcha fetch timeout'));
-        });
-    });
 }
 
 async function getAttendanceFrame(page) {
@@ -281,21 +250,6 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
 
                 const captchaBase64 = await pollFor(async () => {
                     try {
-                        const imgSrc = await loginFrame.evaluate(() => {
-                            const img = document.querySelector('#captchaimg') || document.querySelector('img[src*="captcha"]');
-                            return img ? img.src : null;
-                        });
-                        if (imgSrc) {
-                            const frameUrl = loginFrame.url();
-                            const cookies = await page.cookies();
-                            const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-                            return await fetchCaptchaDirect(imgSrc, frameUrl, cookieHeader);
-                        }
-                    } catch (e) {
-                        console.warn(`[FAST-SCRAPE] Direct captcha fetch failed: ${e.message}`);
-                    }
-
-                    try {
                         return await loginFrame.evaluate(() => {
                             const selectors = [
                                 '#captchaimg',
@@ -335,7 +289,7 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                                 return img.src.split(',')[1];
                             }
 
-                            const scale = 2;
+                            const scale = 3;
                             const canvas = doc.createElement('canvas');
                             canvas.width = img.naturalWidth * scale;
                             canvas.height = img.naturalHeight * scale;
@@ -379,7 +333,7 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
 
                 try {
                     await loginFrame.click('input[name="login"]');
-                    await new Promise(r => setTimeout(r, 1200));
+                    await new Promise(r => setTimeout(r, 2000));
                     page.off('dialog', dialogHandler);
 
                     const stillOnLogin = await loginFrame.evaluate(() => !!document.querySelector('input[name="uid"]')).catch(() => false);
@@ -430,12 +384,24 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                 if (attempt < maxAttempts) {
                     console.log(`[FAST-SCRAPE] [${el()}] CAPTCHA wrong. Refreshing...`);
                     try {
-                        await loginFrame.evaluate(() => { if (typeof refreshcaptcha1 === 'function') refreshcaptcha1(); }).catch(() => {});
+                        await page.evaluate(() => {
+                            if (typeof refreshcaptcha1 === 'function') refreshcaptcha1();
+                        }).catch(() => {});
                     } catch (e) {
                         loginFrame = await findLoginFrame();
                     }
-                    await new Promise(r => setTimeout(r, 300));
+                    await new Promise(r => setTimeout(r, 500));
                     loginFrame = await findLoginFrame();
+                    if (!loginFrame) {
+                        console.log(`[FAST-SCRAPE] [${el()}] Re-navigating to login...`);
+                        await page.evaluate(() => {
+                            const link = Array.from(document.querySelectorAll('a'))
+                                .find(a => a.textContent.trim().toLowerCase().includes('student login'));
+                            if (link) link.click();
+                        }).catch(() => {});
+                        await new Promise(r => setTimeout(r, 1000));
+                        loginFrame = await findLoginFrame();
+                    }
                     if (!loginFrame) throw new Error('Login frame lost after captcha refresh.');
                 }
             }
