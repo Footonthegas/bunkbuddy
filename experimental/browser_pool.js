@@ -337,6 +337,7 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                 }
 
                 let alertMsg = null;
+                let navResult = null;
                 const dialogHandler = async (dialog) => {
                     alertMsg = dialog.message();
                     console.log(`[FAST-SCRAPE] Alert: ${alertMsg}`);
