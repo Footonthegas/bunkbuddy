@@ -168,7 +168,14 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
   } finally {
     if (browserToClose) {
       await browserToClose.close().catch(() => {});
+      }
     }
+  } catch (err) {
+    console.error('Refresh error:', err.message);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Could not connect to IMS NSUT.',
+    });
   }
 });
 
@@ -279,6 +286,13 @@ app.post('/api/data/refresh', async (req, res) => {
         await browserToClose.close().catch(() => {});
       }
     }
+  } catch (err) {
+    console.error('Refresh error:', err.message);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Could not connect to IMS NSUT.',
+    });
+  }
 });
 
 app.get('/api/holidays', (req, res) => {
