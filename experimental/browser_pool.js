@@ -240,6 +240,8 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
             if (!loginFrame) throw new Error('Login frame not found on IMS.');
             console.log(`[FAST-SCRAPE] [${el()}] Login frame located`);
 
+            await new Promise(r => setTimeout(r, 300));
+
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 if (!loginFrame || loginFrame.isDetached()) {
                     loginFrame = await findLoginFrame();
@@ -249,12 +251,53 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                 const captchaBase64 = await pollFor(async () => {
                     try {
                         return await loginFrame.evaluate(() => {
-                            const img = document.querySelector('#captchaimg') || document.querySelector('img[src*="captcha"]');
-                            if (!img || !img.naturalWidth) return null;
-                            const c = document.createElement('canvas');
-                            c.width = img.naturalWidth; c.height = img.naturalHeight;
-                            c.getContext('2d').drawImage(img, 0, 0);
-                            return c.toDataURL('image/jpeg', 1.0).split(',')[1];
+                            const selectors = [
+                                '#captchaimg',
+                                'img[src*="captcha"]',
+                                'img[src*="Captcha"]',
+                                'img[alt*="captcha"]',
+                                'img[title*="captcha"]',
+                                '.captcha img',
+                                '#captcha img',
+                                'img[src*="captchaimg"]',
+                                'img[src*="checkcode"]',
+                                'img[src*="security"]',
+                                'img[src*="rand"]',
+                                'img[src*="random"]'
+                            ];
+                            const doc = document;
+                            let img = null;
+                            for (const sel of selectors) {
+                                img = doc.querySelector(sel);
+                                if (img) break;
+                            }
+                            if (!img) {
+                                const allImgs = doc.querySelectorAll('img');
+                                for (const el of allImgs) {
+                                    const src = (el.src || '').toLowerCase();
+                                    if (src.includes('captcha') || src.includes('checkcode') || src.includes('security') || src.includes('rand') || src.includes('random')) {
+                                        img = el;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!img) return null;
+                            if (!img.naturalWidth && img.complete) return null;
+                            if (!img.naturalWidth) return null;
+
+                            if (img.src && img.src.startsWith('data:image')) {
+                                return img.src.split(',')[1];
+                            }
+
+                            const scale = 2;
+                            const canvas = doc.createElement('canvas');
+                            canvas.width = img.naturalWidth * scale;
+                            canvas.height = img.naturalHeight * scale;
+                            const ctx = canvas.getContext('2d');
+                            ctx.imageSmoothingEnabled = true;
+                            ctx.imageSmoothingQuality = 'high';
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            return canvas.toDataURL('image/png').split(',')[1];
                         });
                     } catch (e) {
                         return null;
