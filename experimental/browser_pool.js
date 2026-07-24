@@ -224,13 +224,17 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
             console.log(`[FAST-SCRAPE] [${el()}] Student Login clicked`);
 
             async function findLoginFrame() {
-                for (let i = 0; i < 120; i++) {
-                    for (const frame of page.frames()) {
+                for (let i = 0; i < 200; i++) {
+                    const frames = page.frames();
+                    for (const frame of frames) {
                         try {
                             if (frame.isDetached()) continue;
                             const hasUid = await frame.evaluate(() => !!document.querySelector('input[name="uid"]'));
                             if (hasUid) return frame;
                         } catch (e) {}
+                    }
+                    if (i % 40 === 0 && frames.length === 0) {
+                        console.warn(`[FAST-SCRAPE] No frames found at poll ${i}`);
                     }
                     await new Promise(r => setTimeout(r, 50));
                 }
@@ -238,16 +242,24 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
             }
 
             let loginFrame = await findLoginFrame();
-            if (!loginFrame) throw new Error('Login frame not found on IMS.');
+            if (!loginFrame) {
+                console.warn(`[FAST-SCRAPE] Initial frame not found, retrying navigation...`);
+                await page.evaluate(() => {
+                    const link = Array.from(document.querySelectorAll('a'))
+                        .find(a => a.textContent.trim().toLowerCase().includes('student login'));
+                    if (link) link.click();
+                }).catch(() => {});
+                await new Promise(r => setTimeout(r, 2000));
+                loginFrame = await findLoginFrame();
+                if (!loginFrame) throw new Error('Login frame not found on IMS.');
+            }
             console.log(`[FAST-SCRAPE] [${el()}] Login frame located`);
 
             await new Promise(r => setTimeout(r, 800));
 
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-                if (!loginFrame) {
-                    loginFrame = await findLoginFrame();
-                    if (!loginFrame) throw new Error('Login frame lost during authentication.');
-                }
+                loginFrame = await findLoginFrame();
+                if (!loginFrame) throw new Error('Login frame lost during authentication.');
 
                 const captchaBase64 = await pollFor(async () => {
                     try {
