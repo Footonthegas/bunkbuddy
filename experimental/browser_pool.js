@@ -330,7 +330,8 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
         await context.close().catch(() => {});
     }
 }
-throw lastError;
+throw lastError || new Error('Login failed after maximum attempts.');
+}
 
 /**
  * Fast refresh using cached cookies - no CAPTCHA needed
