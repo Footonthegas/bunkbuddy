@@ -47,8 +47,8 @@ async function doBackgroundRefresh() {
 
     try {
         const targetRoll = rollNumber || localStorage.getItem('bb_roll_id') || "";
-        const sem = document.getElementById('dashSemInput')?.value || localStorage.getItem('bb_semester') || '1';
-        const yr = document.getElementById('dashYearInput')?.value || localStorage.getItem('bb_year') || '2026-27';
+        const sem = localStorage.getItem('bb_semester') || document.getElementById('dashSemInput')?.value || '1';
+        const yr = localStorage.getItem('bb_year') || document.getElementById('dashYearInput')?.value || '2026-27';
 
         localStorage.setItem('bb_semester', sem);
         localStorage.setItem('bb_year', yr);
@@ -107,8 +107,8 @@ function renderHome() {
 
     const semInput = document.getElementById('dashSemInput');
     const yrInput = document.getElementById('dashYearInput');
-    if (semInput) semInput.value = localStorage.getItem('bb_semester') || '1';
-    if (yrInput) yrInput.value = localStorage.getItem('bb_year') || '2026-27';
+    if (semInput) semInput.value = localStorage.getItem('bb_semester') || semInput.value || '1';
+    if (yrInput) yrInput.value = localStorage.getItem('bb_year') || yrInput.value || '2026-27';
 
     const refreshBtn = document.getElementById('refreshAttendanceBtn');
     if (refreshBtn) {
