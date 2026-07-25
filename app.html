@@ -226,6 +226,7 @@
       <a href="#" class="sidebar-link" data-page="connect">Connect</a>
       <a href="#" class="sidebar-link" data-page="resultHub">ResultHub</a>
       <a href="#" class="sidebar-link" data-page="pro">Plans</a>
+      <a href="#" class="sidebar-link" data-page="service">Services</a>
       <div class="sidebar-divider"></div>
       <a href="#" class="sidebar-link" data-page="about">About Us</a>
       <a href="#" class="sidebar-link" data-page="faq">FAQs</a>
@@ -317,6 +318,10 @@
         <!-- Loaded dynamically from pages/pro.html -->
       </section>
 
+      <section class="page-panel" id="page-service">
+        <!-- Loaded dynamically from pages/service.html -->
+      </section>
+
       <section class="page-panel" id="page-about">
         <!-- Loaded dynamically from pages/about.html -->
       </section>
@@ -352,6 +357,7 @@
         <h4 style="margin-bottom: 15px; color: var(--text-primary); font-size: 0.85rem; font-weight: 500;">Company</h4>
         <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px;">
           <li><a href="#" class="footer-link" data-page="about" style="color: var(--text-secondary); text-decoration: none;">About Us</a></li>
+          <li><a href="#" class="footer-link" data-page="service" style="color: var(--text-secondary); text-decoration: none;">Services</a></li>
           <li><a href="#" class="footer-link" data-page="faq" style="color: var(--text-secondary); text-decoration: none;">FAQs</a></li>
           <li><a href="#" class="footer-link" data-page="pro" style="color: var(--text-secondary); text-decoration: none;">Plans</a></li>
           <li><a href="privacy.html" style="color: var(--text-secondary); text-decoration: none;">Privacy Policy</a></li>
@@ -391,7 +397,7 @@
     showPageLoading();
 
     async function loadPages() {
-      const pages = ['home', 'academics', 'resources', 'attendance', 'connect', 'resultHub', 'pro', 'about', 'faq', 'refund', 'cancellation', 'shipping'];
+      const pages = ['home', 'academics', 'resources', 'attendance', 'connect', 'resultHub', 'pro', 'service', 'about', 'faq', 'refund', 'cancellation', 'shipping'];
       for (const page of pages) {
         try {
           const res = await fetch(`pages/${page}.html?v=${Date.now()}`);
