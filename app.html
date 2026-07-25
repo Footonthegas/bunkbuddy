@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
   <title>BunkBuddy</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/app-extra.css">
@@ -299,6 +300,10 @@
         <!-- Loaded dynamically from pages/cancellation.html -->
       </section>
 
+      <section class="page-panel" id="page-shipping">
+        <!-- Loaded dynamically from pages/shipping.html -->
+      </section>
+
     </div>
   </main>
   <!-- Custom Beautiful Footer -->
@@ -325,6 +330,7 @@
         <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px;">
           <li><a href="#" class="footer-link" data-page="refund" style="color: var(--text-secondary); text-decoration: none;">Refund Policy</a></li>
           <li><a href="#" class="footer-link" data-page="cancellation" style="color: var(--text-secondary); text-decoration: none;">Cancellation Policy</a></li>
+          <li><a href="#" class="footer-link" data-page="shipping" style="color: var(--text-secondary); text-decoration: none;">Shipping Policy</a></li>
         </ul>
         <div id="footerCancelContainer" style="margin-top: 20px; display: none;">
           <button id="cancelSubscriptionBtn" style="padding: 10px 18px; border-radius: 99px; background: rgba(248, 113, 113, 0.1); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3); cursor: pointer; font-size: 0.85rem; transition: 0.3s;">Cancel Subscription</button>
@@ -351,7 +357,7 @@
     showPageLoading();
 
     async function loadPages() {
-      const pages = ['home', 'academics', 'resources', 'attendance', 'connect', 'resultHub', 'pro', 'about', 'faq', 'refund', 'cancellation'];
+      const pages = ['home', 'academics', 'resources', 'attendance', 'connect', 'resultHub', 'pro', 'about', 'faq', 'refund', 'cancellation', 'shipping'];
       for (const page of pages) {
         try {
           const res = await fetch(`pages/${page}.html?v=${Date.now()}`);
