@@ -134,26 +134,27 @@ async function submitAttendanceForm(formFrame, targetYear, targetSem) {
             
             let encYear = document.querySelector('input[name="enc_year"]')?.value;
             let encSem = document.querySelector('input[name="enc_sem"]')?.value;
-            if (encYear && encSem) {
-                let myForm = document.createElement('form');
-                myForm.method = 'POST';
-                myForm.action = f.action || window.location.href;
-                myForm.target = f.target || '_self';
-                let params = { year: y, sem: s, enc_year: encYear, enc_sem: encSem, submit: 'Submit' };
-                for (let k in params) {
-                    let inp = document.createElement('input');
-                    inp.type = 'hidden'; inp.name = k; inp.value = params[k];
-                    myForm.appendChild(inp);
+            setTimeout(() => {
+                if (encYear && encSem) {
+                    let myForm = document.createElement('form');
+                    myForm.method = 'POST';
+                    myForm.action = f.action || window.location.href;
+                    myForm.target = f.target || '_self';
+                    let params = { year: y, sem: s, enc_year: encYear, enc_sem: encSem, submit: 'Submit' };
+                    for (let k in params) {
+                        let inp = document.createElement('input');
+                        inp.type = 'hidden'; inp.name = k; inp.value = params[k];
+                        myForm.appendChild(inp);
+                    }
+                    document.body.appendChild(myForm);
+                    setTimeout(() => {
+                        try {
+                            HTMLFormElement.prototype.submit.call(myForm);
+                        } catch(e) {}
+                    }, 10);
                 }
-                document.body.appendChild(myForm);
-                setTimeout(() => {
-                    try {
-                        HTMLFormElement.prototype.submit.call(myForm);
-                    } catch(e) {}
-                }, 10);
-                return true;
-            }
-            return false;
+            }, 150);
+            return true;
         }, targetYear || '2026-27', targetSem || '1');
     } catch(evalErr) {
         console.warn("[FAST-SCRAPE] Form evaluate notice:", evalErr.message);
