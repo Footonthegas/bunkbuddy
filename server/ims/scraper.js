@@ -448,22 +448,21 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
         
         // If browser is provided, use Puppeteer to get JS-rendered content
         if (!html && browser) {
-            try {
-                const page = await browser.newPage();
-                await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-                
+             try {
+                 const page = await browser.newPage();
+                 await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                 
                  await page.goto(`https://www.resulthubdtu.com/NSUT/StudentProfile/${year}/${rollNumber}`, { 
-                     waitUntil: 'domcontentloaded', 
-                     timeout: 20000 
+                     waitUntil: 'networkidle0', 
+                     timeout: 30000 
                  });
                  
-                 await new Promise(r => setTimeout(r, 500)); // Wait for JS rendering
-                renderedText = await page.evaluate(() => document.body.innerText);
-                html = await page.content();
-                await page.close().catch(() => {});
-            } catch (e) {
-                console.warn(`[RESULT-HUB] Puppeteer fetch failed: ${e.message}`);
-            }
+                 renderedText = await page.evaluate(() => document.body.innerText);
+                 html = await page.content();
+                 await page.close().catch(() => {});
+             } catch (e) {
+                 console.warn(`[RESULT-HUB] Puppeteer fetch failed: ${e.message}`);
+             }
         }
         
         // Fallback to HTTP fetch if no HTML

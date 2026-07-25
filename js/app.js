@@ -451,17 +451,7 @@ async function loadAcademics() {
             document.getElementById('academicInitials').textContent = initials;
 
             let trendData = data.history.sgpa || [];
-            if (trendData.length === 0) {
-                const s = (parseFloat(data.history.cgpa) || 0);
-                trendData = [s - 0.5, s - 0.2, s + 0.3, s];
-            }
-
-            const getOrdinal = (n) => {
-                const s = ["th", "st", "nd", "rd"];
-                const v = n % 100;
-                return n + (s[(v - 20) % 10] || s[v] || s[0]);
-            };
-            const labelsArray = trendData.map((_, i) => `${getOrdinal(i + 1)} Sem`);
+            const labelsArray = trendData.map((_, i) => `${i + 1} Sem`);
 
             const hdHome = document.getElementById('homeChart');
             const ctxHome = hdHome ? hdHome.getContext('2d') : null;
@@ -506,24 +496,33 @@ async function loadAcademics() {
 
             const semGrid = document.getElementById('semestersGrid');
             if (semGrid) {
-                const semsData = [
-                    { name: 'Semester I', cr: 20, sgpa: '8.40', sgpaColor: '#22d3ee', subjects: [['FCCH0103', 'A+', '#22d3ee'], ['FCEC0116', 'O', '#10b981'], ['FCEE0106', 'A', '#22d3ee'], ['FCHS0105', 'A', '#22d3ee'], ['FCMT0101', 'B+', '#d946ef'], ['VAPD0115', 'A', '#22d3ee']] },
-                    { name: 'Semester II', cr: 24, sgpa: '6.50', sgpaColor: '#eab308', subjects: [['FCCS0102', 'B', '#22d3ee'], ['FCMT0201', 'B+', '#d946ef'], ['FCPH0124', 'B+', '#d946ef'], ['MEMEC201', 'B+', '#d946ef'], ['MEMEC202', 'B+', '#d946ef'], ['MEMEC203', 'C', '#eab308']] },
-                    { name: 'Semester III', cr: 22, sgpa: '8.73', sgpaColor: '#22d3ee', subjects: [['FCFC0301', 'A', '#22d3ee'], ['MEMEC302', 'A', '#22d3ee'], ['MEMEC303', 'A', '#22d3ee'], ['MEMEC304', 'O', '#10b981'], ['MEMEC305', 'O', '#10b981'], ['MEMTC301', 'A', '#22d3ee'], ['VANI0301', 'A+', '#22d3ee']] },
-                    { name: 'Semester IV', cr: 20, sgpa: '9.20', sgpaColor: '#10b981', subjects: [['MEICC405', 'A+', '#22d3ee'], ['MEMEC401', 'A+', '#22d3ee'], ['MEMEC402', 'O', '#10b981'], ['MEMEC403', 'A+', '#22d3ee'], ['MEMEC404', 'A+', '#22d3ee'], ['VAPD0101', 'A', '#22d3ee']] }
-                ];
+                const semsData = data.history.sgpa && data.history.sgpa.length > 0
+                    ? data.history.sgpa.map((sgpa, i) => ({
+                        name: `Semester ${['I','II','III','IV','V','VI','VII','VIII'][i] || 'Sem ' + (i+1)}`,
+                        cr: '--',
+                        sgpa: String(sgpa),
+                        sgpaColor: '#94a3b8',
+                        subjects: []
+                    }))
+                    : [];
                 let semHTML = '';
-                for (let sem of semsData) {
-                    let subHtml = sem.subjects.map(sub => `<div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.03);"><span style="color: #60a5fa; font-size: 0.85rem; font-family: var(--font-mono); letter-spacing: 0.5px;">${sub[0]}</span><span style="color: ${sub[2]}; font-weight: bold; font-size: 0.85rem;">${sub[1]}</span></div>`).join('');
-                    semHTML += `<div class="sem-card" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: rgba(15, 23, 42, 0.8); border-bottom: 2px solid ${sem.sgpaColor};">
-                            <h4 style="margin: 0; font-size: 1.15rem; color: #f8fafc; font-weight: 700;">${sem.name}</h4>
-                            <div style="font-size: 0.85rem; font-family: var(--font-mono);"><span style="color: #64748b; margin-right: 12px;">${sem.cr} cr</span><span style="color: ${sem.sgpaColor}; font-weight: 900; font-size: 1.1rem;">${sem.sgpa}</span></div>
-                        </div>
-                        <div style="padding: 10px 15px;">
-                            ${subHtml}
-                        </div>
-                    </div>`;
+                if (semsData.length > 0) {
+                    for (let sem of semsData) {
+                        let subHtml = sem.subjects.length > 0
+                            ? sem.subjects.map(sub => `<div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.03);"><span style="color: #60a5fa; font-size: 0.85rem; font-family: var(--font-mono); letter-spacing: 0.5px;">${sub[0]}</span><span style="color: ${sub[2]}; font-weight: bold; font-size: 0.85rem;">${sub[1]}</span></div>`).join('')
+                            : '<div style="color: #64748b; padding: 15px;">Detailed subject data not available from ResultHub.</div>';
+                        semHTML += `<div class="sem-card" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: rgba(15, 23, 42, 0.8); border-bottom: 2px solid ${sem.sgpaColor};">
+                                <h4 style="margin: 0; font-size: 1.15rem; color: #f8fafc; font-weight: 700;">${sem.name}</h4>
+                                <div style="font-size: 0.85rem; font-family: var(--font-mono);"><span style="color: #64748b; margin-right: 12px;">${sem.cr} cr</span><span style="color: ${sem.sgpaColor}; font-weight: 900; font-size: 1.1rem;">${sem.sgpa}</span></div>
+                            </div>
+                            <div style="padding: 10px 15px;">
+                                ${subHtml}
+                            </div>
+                        </div>`;
+                    }
+                } else {
+                    semHTML = '<div style="color: #64748b; padding: 20px; text-align: center;">Semester-wise SGPA data not available from ResultHub.</div>';
                 }
                 semGrid.innerHTML = semHTML;
             }
@@ -531,7 +530,7 @@ async function loadAcademics() {
             const compCtx = document.getElementById('comparisonChart');
             if (compCtx && window.Chart) {
                 if (window.chartCompHandle) window.chartCompHandle.destroy();
-                const myCgpa = parseFloat(data.history.cgpa) || 8.14;
+                const myCgpa = parseFloat(data.history.cgpa) || 0;
                 const branchAvg = 5.965;
                 const topperCgpa = 9.699;
 

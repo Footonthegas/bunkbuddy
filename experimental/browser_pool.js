@@ -249,13 +249,13 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
                         .find(a => a.textContent.trim().toLowerCase().includes('student login'));
                     if (link) link.click();
                 }).catch(() => {});
-                await new Promise(r => setTimeout(r, 2000));
+                await new Promise(r => setTimeout(r, 500));
                 loginFrame = await findLoginFrame();
                 if (!loginFrame) throw new Error('Login frame not found on IMS.');
             }
             console.log(`[FAST-SCRAPE] [${el()}] Login frame located`);
 
-            await new Promise(r => setTimeout(r, 800));
+            await new Promise(r => setTimeout(r, 300));
 
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 loginFrame = await findLoginFrame();
@@ -347,7 +347,7 @@ export async function pooledLoginAndScrape(rollNumber, password, year, semester,
 
                 try {
                     await loginFrame.click('input[name="login"]');
-                    await new Promise(r => setTimeout(r, 2000));
+                    await new Promise(r => setTimeout(r, 1000));
                     page.off('dialog', dialogHandler);
 
                     const stillOnLogin = await loginFrame.evaluate(() => !!document.querySelector('input[name="uid"]')).catch(() => false);
