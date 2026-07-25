@@ -147,7 +147,7 @@ body {
 }
 
 .menu-toggle {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   width: 40px;
@@ -160,7 +160,6 @@ body {
   cursor: pointer;
   transition: all 0.25s ease;
   flex-shrink: 0;
-  margin-right: 0.5rem;
 }
 
 .menu-toggle:hover {
@@ -170,7 +169,11 @@ body {
 }
 
 .brand-compact {
-  margin-left: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: var(--text-primary);
 }
 
 .sidebar-overlay {
@@ -281,8 +284,8 @@ body {
     display: flex;
   }
 
-  .nav-pills {
-    display: none !important;
+  .brand-compact {
+    justify-content: flex-start;
   }
 
   .header-actions {

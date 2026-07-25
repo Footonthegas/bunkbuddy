@@ -21,7 +21,11 @@
   }
 
   .brand-compact {
-    justify-content: space-between;
+    justify-content: flex-start;
+  }
+
+  .menu-toggle {
+    display: flex;
   }
 
   .header-actions {
