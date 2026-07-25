@@ -78,6 +78,61 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Roll number and password are required.' });
   }
 
+  // Demo login for Razorpay verification
+  if (rollNumber === '12345' && password === '12345') {
+    const demoSessionId = uuidv4();
+    const demoData = {
+      home: {
+        profile: { name: 'Demo User', program: 'B.Tech', cgpa: '8.50', semester: '4' },
+        summary: [
+          { subject: 'Demo Subject A', attended: '32', absent: '8', total: '40', percentage: '80.00%', statusText: 'bunkable', statusNumber: 5 },
+          { subject: 'Demo Subject B', attended: '35', absent: '5', total: '40', percentage: '87.50%', statusText: 'bunkable', statusNumber: 12 },
+        ]
+      },
+      attendance: [
+        { subject: 'Demo Subject A', attended: '32', absent: '8', total: '40', percentage: '80.00%', statusText: 'bunkable', statusNumber: 5 },
+        { subject: 'Demo Subject B', attended: '35', absent: '5', total: '40', percentage: '87.50%', statusText: 'bunkable', statusNumber: 12 },
+      ],
+      detailedAttendance: {
+        matrix: [],
+        subjects: [],
+        summary: { totalClasses: ['40', '40'], totalAbsent: ['8', '5'], totalPresent: ['32', '35'], percentages: ['80.00%', '87.50%'] },
+        legend: {}
+      },
+      resources: [],
+      connect: []
+    };
+    const demoHistory = {
+      cgpa: '8.50',
+      universityRank: '#150',
+      deptRank: '#12',
+      credits: '92',
+      sgpa: [8.2, 7.8, 8.5, 8.5],
+      major: 'COMPUTER SCIENCE & ENGINEERING',
+      name: 'Demo User',
+      url: 'https://www.resulthubdtu.com/NSUT/StudentProfile/2028/12345'
+    };
+    sessions.set(demoSessionId, {
+      sessionId: demoSessionId,
+      rollNumber: '12345',
+      data: demoData,
+      history: demoHistory,
+      cookies: [],
+      cookieJar: null,
+      password: '12345',
+      semester: semester || '4',
+      year: year || '2025-26'
+    });
+    return res.json({
+      success: true,
+      sessionId: demoSessionId,
+      rollNumber: '12345',
+      data: demoData,
+      history: demoHistory,
+      mode: 'demo'
+    });
+  }
+
   // Always perform live scrape to return latest attendance data per user request
 
   // 2. Attempt Experimental Fast Scraper if enabled

@@ -92,6 +92,7 @@ async function handleLogin() {
       localStorage.setItem('bb_roll_id', result.rollNumber || rollNumber);
       localStorage.setItem('bb_semester', semester);
       localStorage.setItem('bb_year', year);
+      sessionStorage.setItem('bb_just_logged_in', 'true');
       
       await new Promise(r => setTimeout(r, 400));
       window.location.href = 'app.html';

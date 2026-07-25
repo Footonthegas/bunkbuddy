@@ -9,11 +9,16 @@ const data = session.data || { home: {}, attendance: [], detailedAttendance: nul
 window.data = data;
 const rollNumber = session.rollNumber ? session.rollNumber.toUpperCase() : 'UNKNOWN';
 
-// Auto-refresh if data is missing
-if (!session.data || !session.data.attendance || session.data.attendance.length === 0) {
+// Render dashboard immediately with cached data (don't wait for pages to load)
+renderHome();
+
+// Auto-refresh only on subsequent visits, skip if user just logged in (login response has fresh data)
+const justLoggedIn = sessionStorage.getItem('bb_just_logged_in');
+sessionStorage.removeItem('bb_just_logged_in');
+if (!justLoggedIn && (!session.data || !session.data.attendance || session.data.attendance.length === 0)) {
     const pwd = localStorage.getItem('bb_password');
     if (pwd && session.sessionId) {
-        setTimeout(() => doBackgroundRefresh(), 500);
+        setTimeout(() => doBackgroundRefresh(), 1000);
     }
 }
 
@@ -512,7 +517,7 @@ async function loadAcademics() {
                     for (let sem of semsData) {
                         let subHtml = sem.subjects.length > 0
                             ? sem.subjects.map(sub => `<div style="display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.03);"><span style="color: #60a5fa; font-size: 0.85rem; font-family: var(--font-mono); letter-spacing: 0.5px;">${sub[0]}</span><span style="color: ${sub[2]}; font-weight: bold; font-size: 0.85rem;">${sub[1]}</span></div>`).join('')
-                            : '<div style="color: #64748b; padding: 15px;">Detailed subject data not available from ResultHub.</div>';
+                            : '';
                         semHTML += `<div class="sem-card" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; background: rgba(15, 23, 42, 0.8); border-bottom: 2px solid ${sem.sgpaColor};">
                                 <h4 style="margin: 0; font-size: 1.15rem; color: #f8fafc; font-weight: 700;">${sem.name}</h4>
