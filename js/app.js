@@ -324,11 +324,12 @@ function renderLinks(containerId, items, emptyMsg) {
 }
 
 function setupNav() {
-    const pills = document.querySelectorAll('.nav-pill[data-page], .footer-link[data-page]');
+    const pills = document.querySelectorAll('.nav-pill[data-page], .footer-link[data-page], .sidebar-link[data-page]');
     const panels = document.querySelectorAll('.page-panel');
 
     pills.forEach((pill) => {
-        pill.addEventListener('click', () => {
+        pill.addEventListener('click', (e) => {
+            e.preventDefault();
             const page = pill.dataset.page;
             pills.forEach((p) => p.classList.toggle('active', p === pill));
             panels.forEach((panel) => panel.classList.toggle('active', panel.id === `page-${page}`));
@@ -341,6 +342,7 @@ function setupNav() {
             }
             
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            closeSidebar();
         });
     });
 
@@ -349,6 +351,42 @@ function setupNav() {
         const targetPill = Array.from(pills).find(p => p.dataset.page === savedTab);
         if (targetPill) targetPill.click();
     }
+}
+
+function setupSidebar() {
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const sidebarClose = document.getElementById('sidebarClose');
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
+
+    function openSidebar() {
+        sidebar.classList.add('active');
+        sidebarOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    window.closeSidebar = function closeSidebar() {
+        sidebar.classList.remove('active');
+        sidebarOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    };
+
+    if (menuToggle) menuToggle.addEventListener('click', openSidebar);
+    if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            if (!link.dataset.page) {
+                closeSidebar();
+            }
+        });
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeSidebar();
+    });
 }
 
 function setupTheme() {
@@ -657,6 +695,7 @@ function initializeApp() {
         setupTheme();
         setupEtherealShadows();
         setupCloudMascot();
+        setupSidebar();
         loadAcademics();
     } catch (e) {
         console.error('[APP] Initialization error:', e);

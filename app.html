@@ -8,6 +8,7 @@
   <title>BunkBuddy</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/app-extra.css">
+  <link rel="stylesheet" href="css/mobile.css" media="screen and (max-width: 768px)">
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -207,6 +208,37 @@
 </head>
 
 <body>
+
+  <!-- Sidebar -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span>Menu</span>
+      <button class="sidebar-close" id="sidebarClose" aria-label="Close menu">
+        <i class="ph ph-x"></i>
+      </button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="sidebar-link" data-page="home">Home</a>
+      <a href="#" class="sidebar-link" data-page="academics">Academics</a>
+      <a href="#" class="sidebar-link" data-page="resources">Resources</a>
+      <a href="#" class="sidebar-link" data-page="attendance">Attendance</a>
+      <a href="#" class="sidebar-link" data-page="connect">Connect</a>
+      <a href="#" class="sidebar-link" data-page="resultHub">ResultHub</a>
+      <a href="#" class="sidebar-link" data-page="pro">BunkBuddy Pro</a>
+      <div class="sidebar-divider"></div>
+      <a href="#" class="sidebar-link" data-page="about">About Us</a>
+      <a href="#" class="sidebar-link" data-page="faq">FAQs</a>
+      <a href="#" class="sidebar-link" data-page="refund">Refund Policy</a>
+      <a href="#" class="sidebar-link" data-page="cancellation">Cancellation Policy</a>
+      <a href="#" class="sidebar-link" data-page="shipping">Shipping Policy</a>
+      <div class="sidebar-divider"></div>
+      <a href="privacy.html" class="sidebar-link">Privacy Policy</a>
+      <a href="terms.html" class="sidebar-link">Terms of Services</a>
+      <a href="contact.html" class="sidebar-link">Contact Us</a>
+    </nav>
+  </aside>
+
   <!-- Optimized Hardware Accelerated Background Wrapper -->
   <div class="ethereal-wrap">
     <div id="ethereal-bg-inner" style="filter:url(#shadowoverlay) blur(2px);">
@@ -234,11 +266,12 @@
   </div>
 
   <header class="app-header">
+    <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+      <i class="ph ph-list"></i>
+    </button>
     <a href="app.html" class="brand-compact">
       <img src="assets/logo.png" alt="BunkBuddy">
-      <span
-        style="font-family: 'Outfit', sans-serif; font-weight: 500; font-size: 1.4rem; letter-spacing: -0.5px;">Bunk<em
-          style="font-style: normal; font-weight: 500; opacity: 0.7;">Buddy</em></span>
+      <span style="font-family: 'Outfit', sans-serif; font-weight: 500; font-size: 1.4rem; letter-spacing: -0.5px;">Bunk<em style="font-style: normal; font-weight: 500; opacity: 0.7;">Buddy</em></span>
     </a>
     <nav class="nav-pills" id="mainNav">
       <button class="nav-pill active" data-page="home">Home</button>

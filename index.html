@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    <link rel="stylesheet" href="css/mobile.css" media="screen and (max-width: 768px)">
     <title>BunkBuddy // Log in</title>
     
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -94,7 +96,12 @@
             position: absolute;
             top: 0;
             left: 0;
-            pointer-events: none; /* Let right pane still have interactions if any */
+            pointer-events: none;
+        }
+
+        #webgl-container canvas {
+            width: 100% !important;
+            height: 100% !important;
         }
 
         /* Controls */
@@ -254,17 +261,35 @@
         .footer-links a:hover { text-decoration: underline; }
         
         @media (max-width: 768px) {
-            body { flex-direction: column; overflow: auto; }
-            .left-pane { width: 100%; height: 100vh; overflow-y: auto; }
-            .right-pane { display: none; } /* Hide shader on mobile for now */
+            body { flex-direction: column; overflow: auto; zoom: 1 !important; }
+            .right-pane { display: none !important; }
+            #webgl-container { display: none !important; }
+            #mobile-shader-bg { display: block !important; }
+            .left-pane { 
+                width: 100%; 
+                height: auto; 
+                min-height: 100vh; 
+                overflow-y: auto; 
+                padding: 1.5rem; 
+                background: rgba(5, 10, 5, 0.65);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                position: relative;
+                z-index: 10;
+            }
+            .cv-header { margin-bottom: 2rem; }
+            .cv-header h1 { font-size: 1rem; margin-bottom: 1.5rem; }
+            .cv-header h2 { font-size: 1rem; }
+            .cv-header h3 { font-size: 1rem; }
+            .form-row { margin-bottom: 1rem; }
+            .submit-btn { width: 100%; padding: 0.9rem; font-size: 0.9rem; }
+            .login-form { max-width: 100%; }
         }
     </style>
 </head>
 <body>
 
     <div class="left-pane">
-
-
         <div>
             <div class="cv-header">
                 <h1>BunkBuddy.login</h1>
@@ -366,17 +391,16 @@ CHECKING RAM: 640KB OK...</div>
         camera.position.z = 1;
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        // Only render on right-pane size!
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         const resizeCanvas = () => {
-             const rightPane = document.querySelector('.right-pane');
-             if(rightPane && rightPane.clientWidth > 0) {
-                 renderer.setSize(rightPane.clientWidth, rightPane.clientHeight);
-                 if(material) material.uniforms.u_resolution.value.set(rightPane.clientWidth, rightPane.clientHeight);
-             }
+            const rightPane = document.querySelector('.right-pane');
+            if(rightPane && rightPane.clientWidth > 0) {
+                renderer.setSize(rightPane.clientWidth, rightPane.clientHeight, false);
+                if(material) material.uniforms.u_resolution.value.set(rightPane.clientWidth, rightPane.clientHeight);
+            }
         };
         
         container.appendChild(renderer.domElement);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
         const geometry = new THREE.PlaneGeometry(2, 2);
 
@@ -474,6 +498,7 @@ CHECKING RAM: 640KB OK...</div>
 
     </script>
     <script type="module" src="js/login.js?v=3"></script>
+    <script src="js/mobile-shader.js"></script>
 
 </body>
 </html>
