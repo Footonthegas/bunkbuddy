@@ -319,7 +319,7 @@ function renderLinks(containerId, items, emptyMsg) {
 }
 
 function setupNav() {
-    const pills = document.querySelectorAll('.nav-pill[data-page]');
+    const pills = document.querySelectorAll('.nav-pill[data-page], .footer-link[data-page]');
     const panels = document.querySelectorAll('.page-panel');
 
     pills.forEach((pill) => {
@@ -334,6 +334,8 @@ function setupNav() {
                     loadAcademics();
                 }, 100);
             }
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     });
 
@@ -709,6 +711,29 @@ if (window.__bb_pagesLoaded) {
 } else {
     document.addEventListener('pagesLoaded', initializeApp);
 }
+
+function setupCancelSubscription() {
+    const container = document.getElementById('footerCancelContainer');
+    const btn = document.getElementById('cancelSubscriptionBtn');
+    if (!container || !btn) return;
+    
+    const isPro = localStorage.getItem('bb_pro_subscription') === 'true';
+    if (isPro) {
+        container.style.display = 'block';
+    }
+    
+    btn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to cancel your BunkBuddy Pro subscription? You will lose access to Pro features at the end of your current billing period.')) {
+            localStorage.removeItem('bb_pro_subscription');
+            container.style.display = 'none';
+            alert('Your subscription has been canceled. You will continue to have Pro access until the end of your current billing period.');
+        }
+    });
+}
+
+window.addEventListener('pagesLoaded', () => {
+    setupCancelSubscription();
+});
 
 window.addEventListener('error', (e) => {
     console.error('[APP] Global error:', e.message);

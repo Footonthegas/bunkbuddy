@@ -122,9 +122,16 @@ async function submitAttendanceForm(formFrame, targetYear, targetSem) {
             let f = document.forms['frm'];
             if (!f) return false;
             let yearSel = document.querySelector('select[name="year"]');
-            if (yearSel) yearSel.value = y;
+            if (yearSel) {
+                yearSel.value = y;
+                yearSel.dispatchEvent(new Event('change', { bubbles: true }));
+            }
             let semSel = document.querySelector('select[name="sem"]');
-            if (semSel) semSel.value = s;
+            if (semSel) {
+                semSel.value = s;
+                semSel.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            
             let encYear = document.querySelector('input[name="enc_year"]')?.value;
             let encSem = document.querySelector('input[name="enc_sem"]')?.value;
             if (encYear && encSem) {

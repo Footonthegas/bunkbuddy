@@ -45,7 +45,7 @@
         <span style="color: #64748b; font-size: 1.2rem; font-weight: 600;">/ month</span>
       </div>
 
-      <button class="solid-btn" id="startCheckoutBtn" onclick="alert('Proceed to Razorpay Secure Checkout...')"
+      <button class="solid-btn" id="startCheckoutBtn" onclick="localStorage.setItem('bb_pro_subscription', 'true'); alert('Welcome to BunkBuddy Pro!'); window.dispatchEvent(new Event('pagesLoaded'));"
         style="width: 100%; border-radius: 99px; padding: 18px 24px; margin-bottom: 35px; transition: all 0.3s ease; font-size: 1.15rem; font-weight: 700; background: #ffffff; color: #000000; border: none; letter-spacing: 0.5px; box-shadow: 0 8px 25px rgba(255,255,255,0.15);">
         Get BunkBuddy PRO
       </button>

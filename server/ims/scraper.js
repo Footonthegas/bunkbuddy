@@ -290,41 +290,47 @@ export async function scrapeStudentData(page, browser, targetYear, targetSem, ro
                
                let htmlSubmitted = false;
                try {
-                   htmlSubmitted = await formFrame.evaluate((y, s) => {
-                      let f = document.forms['frm'];
-                      if (!f) return false;
-                      
-                      let yearSel = document.querySelector('select[name="year"]');
-                      if (yearSel) yearSel.value = y;
-                      
-                      let semSel = document.querySelector('select[name="sem"]');
-                      if (semSel) semSel.value = s;
-                      
-                      let encYear = document.querySelector('input[name="enc_year"]')?.value;
-                      let encSem = document.querySelector('input[name="enc_sem"]')?.value;
-                      if (encYear && encSem) {
-                          let myForm = document.createElement('form');
-                          myForm.method = 'POST';
-                          myForm.action = f.action || window.location.href;
-                          myForm.target = f.target || '_self';
-                          
-                          let params = { year: y, sem: s, enc_year: encYear, enc_sem: encSem, submit: 'Submit' };
-                          for (let k in params) {
-                             let inp = document.createElement('input');
-                             inp.type = 'hidden'; inp.name = k; inp.value = params[k];
-                             myForm.appendChild(inp);
-                          }
-                          
-                          document.body.appendChild(myForm);
-                          setTimeout(() => {
-                              try {
-                                  HTMLFormElement.prototype.submit.call(myForm);
-                              } catch(e) {}
-                          }, 10);
-                          return true;
-                      }
-                      return false;
-                   }, targetYear || '2026-27', targetSem || '1');
+                    htmlSubmitted = await formFrame.evaluate((y, s) => {
+                       let f = document.forms['frm'];
+                       if (!f) return false;
+                       
+                       let yearSel = document.querySelector('select[name="year"]');
+                       if (yearSel) {
+                           yearSel.value = y;
+                           yearSel.dispatchEvent(new Event('change', { bubbles: true }));
+                       }
+                       
+                       let semSel = document.querySelector('select[name="sem"]');
+                       if (semSel) {
+                           semSel.value = s;
+                           semSel.dispatchEvent(new Event('change', { bubbles: true }));
+                       }
+                       
+                       let encYear = document.querySelector('input[name="enc_year"]')?.value;
+                       let encSem = document.querySelector('input[name="enc_sem"]')?.value;
+                       if (encYear && encSem) {
+                           let myForm = document.createElement('form');
+                           myForm.method = 'POST';
+                           myForm.action = f.action || window.location.href;
+                           myForm.target = f.target || '_self';
+                           
+                           let params = { year: y, sem: s, enc_year: encYear, enc_sem: encSem, submit: 'Submit' };
+                           for (let k in params) {
+                              let inp = document.createElement('input');
+                              inp.type = 'hidden'; inp.name = k; inp.value = params[k];
+                              myForm.appendChild(inp);
+                           }
+                           
+                           document.body.appendChild(myForm);
+                           setTimeout(() => {
+                               try {
+                                   HTMLFormElement.prototype.submit.call(myForm);
+                               } catch(e) {}
+                           }, 10);
+                           return true;
+                       }
+                       return false;
+                    }, targetYear || '2026-27', targetSem || '1');
                } catch(evalErr) {
                    console.warn("[SCRAPER] Form evaluate notice:", evalErr.message);
                }
