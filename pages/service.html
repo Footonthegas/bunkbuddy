@@ -1,131 +1,302 @@
-<div style="position: relative; overflow: hidden; padding-top: 20px; padding-bottom: 100px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/mobile.css" media="screen and (max-width: 768px)">
+    <title>Service Offered - BunkBuddy</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        :root {
+            --bg-base: #0c0c10;
+            --bg-surface: #101014;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent: #2563eb;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --font-main: 'Plus Jakarta Sans', sans-serif;
+            --font-head: 'Outfit', sans-serif;
+        }
 
-  <div style="position: absolute; top: 15%; left: 20%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(168, 85, 247, 0.08) 0%, transparent 70%); border-radius: 50%; filter: blur(40px); pointer-events: none; z-index: 1;"></div>
-  <div style="position: absolute; bottom: 10%; right: 15%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(56, 189, 248, 0.08) 0%, transparent 70%); border-radius: 50%; filter: blur(50px); pointer-events: none; z-index: 1;"></div>
+        body {
+            font-family: var(--font-main);
+            background: var(--bg-base);
+            color: var(--text-primary);
+            line-height: 1.7;
+            margin: 0;
+            padding: 0;
+            zoom: 1.25;
+        }
 
-  <div style="position: relative; z-index: 10; display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%;">
-    <h1 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 3.5rem; margin-bottom: 30px; line-height: 1.1; font-weight: 800; color: #fff; text-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-      Services
-    </h1>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 40px;
+        }
 
-    <div style="display: flex; flex-wrap: wrap; gap: 2rem; justify-content: center; width: 100%; max-width: 1000px;">
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            margin-bottom: 40px;
+            transition: color 0.3s ease;
+        }
 
-      <!-- BunkBuddy Pro -->
-      <div class="pricing-card" style="
-        background: rgba(12, 12, 16, 0.85);
-        backdrop-filter: blur(40px);
-        -webkit-backdrop-filter: blur(40px);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-top: 1px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 50px 100px rgba(0,0,0,1), inset 0 0 40px rgba(255,255,255,0.03);
-        padding: 40px 35px;
-        border-radius: 28px;
-        max-width: 420px;
-        width: 100%;
-        text-align: left;
-      ">
-        <h2 style="font-size: 2rem; margin: 0 0 5px 0; font-family: var(--font-mono); font-weight: 800; background: linear-gradient(to right, #fff, #cbd5e1); -webkit-background-clip: text; background-clip: text; color: transparent;">
-          BunkBuddy Pro
-        </h2>
-        <p style="color: #94a3b8; font-size: 1rem; margin-bottom: 25px;">
-          For students who want full control and zero manual work.
-        </p>
+        .back-link:hover {
+            color: #fff;
+        }
 
-        <div style="margin-bottom: 25px; display: flex; align-items: baseline; justify-content: flex-start; gap: 8px;">
-          <span style="font-size: 3.5rem; font-weight: 900; color: #fff; line-height: 1;">₹99</span>
-          <span style="color: #64748b; font-size: 1.1rem; font-weight: 600;">/ month</span>
+        h1 {
+            font-family: var(--font-head);
+            font-size: 3rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+
+        p.last-updated {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 50px;
+        }
+
+        section {
+            margin-bottom: 50px;
+        }
+
+        h2 {
+            font-family: var(--font-head);
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #fff;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            font-family: var(--font-head);
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        p, li {
+            color: #cbd5e1;
+            margin-bottom: 15px;
+            font-size: 1.05rem;
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .service-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s ease;
+        }
+
+        .service-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .service-card h3 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .service-card a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .service-card a:hover {
+            text-decoration: underline;
+        }
+
+        .price-tag {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #fff;
+            line-height: 1;
+        }
+
+        .price-tag span {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #64748b;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .feature-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .feature-list li i {
+            margin-top: 3px;
+            flex-shrink: 0;
+        }
+
+        .cta-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            border-radius: 99px;
+            padding: 16px 24px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            background: #ffffff;
+            color: #000000;
+            border: none;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(255,255,255,0.15);
+            font-family: var(--font-main);
+            text-decoration: none;
+        }
+
+        .cta-btn:hover {
+            transform: scale(1.02);
+        }
+
+        .cancel-note {
+            margin-top: 50px;
+            max-width: 600px;
+            padding: 24px 28px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-color);
+            text-align: left;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        .cancel-note h3 {
+            margin: 0 0 12px 0;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .cancel-note p {
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 40px 20px;
+            }
+
+            h1 {
+                font-size: 2.2rem;
+            }
+
+            .price-tag {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="app.html" class="back-link"><i class="ph ph-arrow-left"></i> Back to Dashboard</a>
+
+        <h1>Service Offered</h1>
+        <p class="last-updated">Last Updated: July 26, 2026</p>
+
+        <section>
+            <h2>BunkBuddy Pro</h2>
+            <p>Our flagship plan built for students who want full automation and zero manual effort. Everything you need to stay on top of your attendance, all in one place.</p>
+
+            <div style="margin-bottom: 25px; display: flex; align-items: baseline; justify-content: flex-start; gap: 8px;">
+                <span class="price-tag">₹99</span>
+                <span>/ month</span>
+            </div>
+
+            <button class="cta-btn" onclick="localStorage.setItem('bb_pro_subscription', 'true'); alert('Welcome to BunkBuddy Pro!'); window.dispatchEvent(new Event('pagesLoaded'));">
+                Get BunkBuddy Pro
+            </button>
+
+            <ul class="feature-list" style="margin-top: 25px;">
+                <li>
+                    <i class="ph-fill ph-check-circle" style="color: #10b981; font-size: 1.2rem;"></i>
+                    <span><strong>Attendance alerts</strong> — Get notified the moment a class becomes bunkable. You will never miss an opportunity to skip safely because the system watches your attendance in real time and sends you a prompt as soon as the threshold is met.</span>
+                </li>
+                <li>
+                    <i class="ph-fill ph-check-circle" style="color: #10b981; font-size: 1.2rem;"></i>
+                    <span><strong>Automatic attendance fetching</strong> — Your attendance data is refreshed in the background without you lifting a finger. No more manual refreshes, no more forgetting to sync. The system handles it all so you can focus on what matters.</span>
+                </li>
+                <li>
+                    <i class="ph-fill ph-check-circle" style="color: #10b981; font-size: 1.2rem;"></i>
+                    <span><strong>Advanced analytics</strong> — Go beyond simple percentages. Get subject-wise breakdowns, trend graphs, and predictions that help you understand where you stand and what you need to do to stay safe. The dashboard turns raw data into clear, actionable insights.</span>
+                </li>
+                <li>
+                    <i class="ph-fill ph-check-circle" style="color: #10b981; font-size: 1.2rem;"></i>
+                    <span><strong>Priority support</strong> — Questions, bugs, or feature requests? Our team replies faster for Pro subscribers because we know your time is valuable and you should never be left waiting.</span>
+                </li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Email Alert Lite</h2>
+            <p>A simple, no-fuss plan for students who just want to stay informed without opening the app. Get everything you need delivered straight to your inbox at a time that works for you.</p>
+
+            <div style="margin-bottom: 25px; display: flex; align-items: baseline; justify-content: flex-start; gap: 8px;">
+                <span class="price-tag">₹9</span>
+                <span>/ month</span>
+            </div>
+
+            <button class="cta-btn" onclick="alert('Email Alert Lite setup coming soon!')">
+                Get Email Alert Lite
+            </button>
+
+            <ul class="feature-list" style="margin-top: 25px;">
+                <li>
+                    <i class="ph-fill ph-envelope-simple" style="color: #60a5fa; font-size: 1.2rem;"></i>
+                    <span><strong>Email attendance alerts</strong> — Receive a clean, easy-to-read summary of your attendance directly in your inbox. No need to open the app, no need to remember to check. The email arrives when you want it to.</span>
+                </li>
+                <li>
+                    <i class="ph-fill ph-clock" style="color: #60a5fa; font-size: 1.2rem;"></i>
+                    <span><strong>Pick your own time</strong> — Choose exactly when the email arrives. Morning before college, afternoon after classes, or evening before you plan for the next day. It is entirely your call.</span>
+                </li>
+                <li>
+                    <i class="ph-fill ph-smiley" style="color: #60a5fa; font-size: 1.2rem;"></i>
+                    <span><strong>No more guessing</strong> — We give you the numbers and the context. You decide whether to attend or bunk. We just make sure you have the information you need to make that decision confidently, without the stress of remembering to check.</span>
+                </li>
+                <li>
+                    <i class="ph-fill ph-plus" style="color: #60a5fa; font-size: 1.2rem;"></i>
+                    <span><strong>More notification modes coming soon</strong> — We are working on SMS, WhatsApp, and browser notifications. For now, email is the simplest and most reliable way to stay updated, and it will always remain free to add new channels as they launch.</span>
+                </li>
+            </ul>
+        </section>
+
+        <div class="cancel-note">
+            <h3>Cancellation</h3>
+            <p>You can cancel your subscription anytime from your account settings. Once canceled, you will still have access to the service until the end of your current billing period. No hidden charges, no questions asked, no hassle.</p>
         </div>
-
-        <button class="solid-btn" id="startCheckoutBtn" onclick="localStorage.setItem('bb_pro_subscription', 'true'); alert('Welcome to BunkBuddy Pro!'); window.dispatchEvent(new Event('pagesLoaded'));" style="width: 100%; border-radius: 99px; padding: 16px 24px; margin-bottom: 25px; transition: all 0.3s ease; font-size: 1.05rem; font-weight: 700; background: #ffffff; color: #000000; border: none; letter-spacing: 0.5px; box-shadow: 0 8px 25px rgba(255,255,255,0.15);">
-          Get BunkBuddy PRO
-        </button>
-
-        <div>
-          <h4 style="color: #f1f5f9; font-size: 1rem; margin-bottom: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; font-family: var(--font-mono);">
-            Service offered
-          </h4>
-          <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.95rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 12px;">
-            <li style="display: flex; align-items: flex-start; gap: 12px;">
-              <i class="ph-fill ph-check-circle" style="color: #10b981; font-size: 1.2rem; margin-top: 2px;"></i>
-              <span><strong>Attendance alerts</strong> — Get notified when a class becomes bunkable, so you never miss an opportunity to skip safely.</span>
-            </li>
-            <li style="display: flex; align-items: flex-start; gap: 12px;">
-              <i class="ph-fill ph-check-circle" style="color: #10b981; font-size: 1.2rem; margin-top: 2px;"></i>
-              <span>Automatic attendance fetching — Your attendance data stays fresh in the background. No more manual refreshes.</span>
-            </li>
-            <li style="display: flex; align-items: flex-start; gap: 12px;">
-              <i class="ph-fill ph-check-circle" style="color: #10b981; font-size: 1.2rem; margin-top: 2px;"></i>
-              <span>Advanced analytics — Dig into subject-wise breakdowns, trends, and predictions that help you plan better.</span>
-            </li>
-            <li style="display: flex; align-items: flex-start; gap: 12px;">
-              <i class="ph-fill ph-check-circle" style="color: #10b981; font-size: 1.2rem; margin-top: 2px;"></i>
-              <span>Priority support — Questions or issues? We reply faster because your time matters.</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- Email Alert Lite -->
-      <div class="pricing-card" style="
-        background: rgba(12, 12, 16, 0.85);
-        backdrop-filter: blur(40px);
-        -webkit-backdrop-filter: blur(40px);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-top: 1px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 50px 100px rgba(0,0,0,1), inset 0 0 40px rgba(255,255,255,0.03);
-        padding: 40px 35px;
-        border-radius: 28px;
-        max-width: 420px;
-        width: 100%;
-        text-align: left;
-      ">
-        <h2 style="font-size: 2rem; margin: 0 0 5px 0; font-family: var(--font-mono); font-weight: 800; background: linear-gradient(to right, #fff, #cbd5e1); -webkit-background-clip: text; background-clip: text; color: transparent;">
-          Email Alert Lite
-        </h2>
-        <p style="color: #94a3b8; font-size: 1rem; margin-bottom: 25px;">
-          Stay in the loop without opening the app.
-        </p>
-
-        <div style="margin-bottom: 25px; display: flex; align-items: baseline; justify-content: flex-start; gap: 8px;">
-          <span style="font-size: 3.5rem; font-weight: 900; color: #fff; line-height: 1;">₹9</span>
-          <span style="color: #64748b; font-size: 1.1rem; font-weight: 600;">/ month</span>
-        </div>
-
-        <button class="solid-btn" onclick="alert('Email Alert Lite setup coming soon!')" style="width: 100%; border-radius: 99px; padding: 16px 24px; margin-bottom: 25px; transition: all 0.3s ease; font-size: 1.05rem; font-weight: 700; background: #ffffff; color: #000000; border: none; letter-spacing: 0.5px; box-shadow: 0 8px 25px rgba(255,255,255,0.15);">
-          Get Email Alert Lite
-        </button>
-
-        <div>
-          <h4 style="color: #f1f5f9; font-size: 1rem; margin-bottom: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; font-family: var(--font-mono);">
-            Service offered
-          </h4>
-          <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.95rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 12px;">
-            <li style="display: flex; align-items: flex-start; gap: 12px;">
-              <i class="ph-fill ph-envelope-simple" style="color: #60a5fa; font-size: 1.2rem; margin-top: 2px;"></i>
-              <span><strong>Email attendance alerts</strong> — Receive a clean summary of your attendance directly in your inbox.</span>
-            </li>
-            <li style="display: flex; align-items: flex-start; gap: 12px;">
-              <i class="ph-fill ph-clock" style="color: #60a5fa; font-size: 1.2rem; margin-top: 2px;"></i>
-              <span>Pick your time — Choose when you want the email to arrive. Morning, afternoon, evening — it is your call.</span>
-            </li>
-            <li style="display: flex; align-items: flex-start; gap: 12px;">
-              <i class="ph-fill ph-smiley" style="color: #60a5fa; font-size: 1.2rem; margin-top: 2px;"></i>
-              <span>No more guessing — Get the info you need and decide for yourself whether to attend or bunk. We just make the decision easier.</span>
-            </li>
-            <li style="display: flex; align-items: flex-start; gap: 12px;">
-              <i class="ph-fill ph-plus" style="color: #60a5fa; font-size: 1.2rem; margin-top: 2px;"></i>
-              <span>More modes coming soon — SMS, WhatsApp, and browser notifications are on the way. Right now, email is the simplest way to stay updated.</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-
     </div>
-
-    <div style="margin-top: 50px; max-width: 600px; padding: 24px 28px; border-radius: 20px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); text-align: left; color: var(--text-secondary); font-size: 0.95rem; line-height: 1.7;">
-      <h3 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem; font-weight: 600;">Cancellation</h3>
-      <p style="margin: 0;">You can cancel your subscription anytime from your account settings. Once canceled, you will still have access to the service until the end of your current billing period. No hidden charges, no questions asked.</p>
-    </div>
-
-  </div>
-</div>
+</body>
+</html>

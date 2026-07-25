@@ -24,10 +24,6 @@
     justify-content: flex-start;
   }
 
-  .menu-toggle {
-    display: flex;
-  }
-
   .header-actions {
     width: 100%;
     display: flex;

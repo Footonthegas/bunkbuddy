@@ -147,7 +147,7 @@ body {
 }
 
 .menu-toggle {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 40px;
@@ -160,6 +160,7 @@ body {
   cursor: pointer;
   transition: all 0.25s ease;
   flex-shrink: 0;
+  margin-right: 0.5rem;
 }
 
 .menu-toggle:hover {
@@ -280,10 +281,6 @@ body {
 }
 
 @media (max-width: 768px) {
-  .menu-toggle {
-    display: flex;
-  }
-
   .brand-compact {
     justify-content: flex-start;
   }
