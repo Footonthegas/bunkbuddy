@@ -2,9 +2,9 @@
         <div
           style="margin-bottom: 20px; padding: 10px 0; display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <h1 class="hero-title" id="homeGreeting" style="font-size: 3.2rem; margin-bottom: 10px; line-height: 1.1;">
+            <h1 class="hero-title" id="homeGreeting" style="font-size: 2.5rem; margin-bottom: 10px; line-height: 1.1;">
               Welcome</h1>
-            <p class="hero-sub" id="homeSub" style="color: var(--text-muted); font-size: 1.15rem; margin: 0;">Roll
+            <p class="hero-sub" id="homeSub" style="color: var(--text-muted); font-size: 1rem; margin: 0; letter-spacing: 0.05em; font-weight: 500;">Roll
               XXXXXXXX</p>
           </div>
           <div style="display: flex; gap: 10px; align-items: center;">
@@ -26,9 +26,9 @@
               <option value="2024-25">2024-25</option>
             </select>
             <div style="position: relative;">
-              <button id="refreshAttendanceBtn" class="solid-btn"
-                style="padding: 12px 24px; font-size: 0.95rem; border-radius: 99px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.15); cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 8px;">
-                <i class="ph ph-arrows-clockwise" id="homeSyncSpinner"></i> Refresh Data
+<button id="refreshAttendanceBtn" class="ghost-btn"
+                 style="padding: 12px 24px; font-size: 0.95rem; border-radius: 99px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.15); cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 8px;">
+                 <i class="ph ph-arrows-clockwise" id="homeSyncSpinner"></i> Refresh Data
               </button>
               <div id="homeSyncProgressContainer"
                 style="display: none; position: absolute; bottom: -8px; left: 10%; right: 10%; height: 3px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden;">
@@ -68,7 +68,7 @@
             <div class="card-body" style="font-size: 0.8rem;">
               <div class="ticker-wrap" style="height: 60px;">
                 <div class="ticker" id="noticesTicker">
-                  <div class="empty-state" style="padding: 1rem;">Loading...</div>
+                  <div class="empty-state" style="padding: 1rem;">No notices yet</div>
                 </div>
               </div>
             </div>
@@ -101,7 +101,7 @@
                 style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;">
                 <!-- Days will be injected here -->
               </div>
-              <div id="adminControls" style="display: none; margin-top: 10px; font-size: 0.7rem; color: #ff9800;">
+              <div id="adminControls" style="display: none; margin-top: 10px; font-size: 0.7rem; color: var(--color-accent-warning);">
                 <i class="ph ph-shield-check"></i> Admin Mode
               </div>
             </div> <!-- Closes card-body -->
@@ -113,19 +113,18 @@
           <h3 style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;"><i
               class="ph ph-graduation-cap"></i> Academic Overview</h3>
           <div class="dashboard-grid layout-bottom" style="grid-template-columns: 1fr 1fr 2fr; gap: 20px;">
-            <div class="dash-card"
-              style="padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center; background: linear-gradient(145deg, rgba(34,197,94,0.1), transparent);">
+            <div class="dash-card dash-card--highlight" style="padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
               <div
                 style="color: var(--text-muted); text-transform: uppercase; font-size: 0.8rem; font-weight: 500; letter-spacing: 1px; margin-bottom: 10px;">
                 Current CGPA</div>
-              <div id="homeCgpa" style="font-size: 3rem; font-weight: bold; color: #6ee7a0;">--</div>
+              <div id="homeCgpa" style="font-size: 3rem; font-weight: bold; color: var(--color-accent-primary);">--</div>
             </div>
             <div class="dash-card"
-              style="padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center; background: linear-gradient(145deg, rgba(59,130,246,0.1), transparent);">
+              style="padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
               <div
                 style="color: var(--text-muted); text-transform: uppercase; font-size: 0.8rem; font-weight: 500; letter-spacing: 1px; margin-bottom: 10px;">
                 Branch Rank</div>
-              <div id="homeRank" style="font-size: 3rem; font-weight: bold; color: #93c5fd;">--</div>
+              <div id="homeRank" style="font-size: 3rem; font-weight: bold; color: var(--color-text-neutral-stat);">--</div>
             </div>
             <div class="dash-card" style="padding: 20px; position: relative;">
               <div
@@ -137,8 +136,8 @@
             </div>
           </div>
           <div style="text-align: right; margin-top: 15px;">
-            <button class="nav-pill" onclick="document.querySelector('[data-page=\'academics\']').click()"
-              style="background: var(--bg-surface-2);">View Detailed Report <i class="ph ph-arrow-right"></i></button>
+            <button class="ghost-btn" onclick="document.querySelector('[data-page=\'academics\']').click()"
+              style="background: var(--bg-surface-2); border-color: rgba(255,255,255,0.1);">View Detailed Report <i class="ph ph-arrow-right"></i></button>
           </div>
         </div>
 
@@ -147,7 +146,7 @@
           style="margin-bottom: 30px; padding: 40px; background: color-mix(in srgb, var(--bg-surface-1) 50%, transparent); border: 1px solid var(--border-color); border-radius: var(--radius-card); display: flex; align-items: center; justify-content: center; gap: 40px; overflow: hidden; flex-wrap: wrap;">
           
           <!-- Cloud Mascot -->
-          <div style="position: relative; width: 280px; height: 160px; flex-shrink: 0;" id="cloudMascot">
+          <div style="position: relative; width: 280px; height: 160px; flex-shrink: 0; border-radius: 16px; background: var(--bg-surface-2); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 60px 15px rgba(34,197,94,0.08); overflow: hidden;" id="cloudMascot">
             <img src="https://pub-940ccf6255b54fa799a9b01050e6c227.r2.dev/cloud.jpg" alt="Cloud Mascot" style="width: 100%; height: 100%; mix-blend-mode: multiply; display: block;">
             
             <!-- Left Eye -->
@@ -169,7 +168,7 @@
             <div class="email-form" style="display: flex; gap: 10px; width: 100%; max-width: 450px; z-index: 2;">
               <input type="email" id="cloudEmailInput" placeholder="Enter your email"
                 style="flex: 1; padding: 12px 20px; border-radius: 99px; border: 1px solid var(--border-color); background: var(--bg-surface-2); color: var(--text-primary); font-family: var(--font-main); outline: none;">
-              <button class="solid-btn" style="border-radius: 99px; padding: 12px 25px;">Subscribe at Rs9/month</button>
+              <button class="solid-btn" style="border-radius: 99px; padding: 12px 25px;">Subscribe at ₹9/month</button>
             </div>
           </div>
         </div>

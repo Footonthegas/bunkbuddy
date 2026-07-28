@@ -122,6 +122,11 @@
   .app-footer .container {
     grid-template-columns: 1fr !important;
     gap: 2rem !important;
+    text-align: left !important;
+  }
+  .app-footer .container > div:first-child {
+    flex-direction: column !important;
+    gap: 2rem !important;
   }
 
   /* Pro pricing card */

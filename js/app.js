@@ -160,7 +160,7 @@ function renderHome() {
                 const offset = circumference - (p / 100) * circumference;
 
                 return `
-                <div class="dash-card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 20px; position: relative; overflow: hidden;">
+                <div class="dash-card" style="display: flex; flex-direction: column; justify-content: space-between;">
                     <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 20px; line-height: 1.3; min-height: 3rem;">${nameTrunc}</div>
                     
                     <div style="display: flex; align-items: flex-end; justify-content: space-between;">
@@ -475,12 +475,12 @@ async function loadAcademics() {
                     datasets: [{
                         label: 'SGPA',
                         data: trendData,
-                        borderColor: '#22d3ee',
-                        backgroundColor: 'rgba(34,211,238,0.1)',
+                        borderColor: '#6ee7a0',
+                        backgroundColor: 'rgba(110,231,160,0.08)',
                         fill: true,
                         tension: 0.4,
                         borderWidth: 3,
-                        pointBackgroundColor: '#22d3ee',
+                        pointBackgroundColor: '#6ee7a0',
                         pointBorderColor: '#fff',
                         pointBorderWidth: 2,
                         pointRadius: 6,

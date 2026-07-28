@@ -9,7 +9,11 @@
   --text-secondary: rgba(255, 255, 255, 0.5);
   --text-tech: rgba(255, 255, 255, 0.3);
   --border-color: rgba(255, 255, 255, 0.15);
-  --accent: #4a88ff;
+  --color-accent-primary: #22c55e;
+  --color-accent-warning: #f59e0b;
+  --color-accent-danger: #ef4444;
+  --color-accent-premium: #f59e0b;
+  --color-text-neutral-stat: #d4d4d4;
   --radius-pill: 999px;
   --radius-card: 24px;
   --font-main: 'Space Grotesk', sans-serif;
@@ -26,6 +30,11 @@
   --text-secondary: rgba(0, 0, 0, 0.5);
   --text-tech: rgba(0, 0, 0, 0.35);
   --border-color: rgba(0, 0, 0, 0.12);
+  --color-accent-primary: #16a34a;
+  --color-accent-warning: #d97706;
+  --color-accent-danger: #dc2626;
+  --color-accent-premium: #d97706;
+  --color-text-neutral-stat: #404040;
 }
 
 * {
@@ -82,9 +91,11 @@ body {
   padding: 1rem 1.5rem;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  background: color-mix(in srgb, var(--bg-base) 50%, rgba(255,255,255,0.03));
+  background: color-mix(in srgb, var(--bg-base) 90%, rgba(255,255,255,0.02));
   border: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
   border-radius: var(--radius-pill);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
 .brand-compact {
@@ -364,7 +375,7 @@ body {
 }
 
 .loading-steps li.done {
-  color: var(--accent);
+  color: var(--color-accent-primary);
 }
 
 .loading-steps li .dot {
@@ -376,8 +387,8 @@ body {
 }
 
 .loading-steps li.active .dot {
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent);
+  background: var(--color-accent-primary);
+  box-shadow: 0 0 8px var(--color-accent-primary);
 }
 
 .loading-steps li.done .dot {
@@ -521,6 +532,10 @@ body {
   left: 200%;
 }
 
+.dash-card--highlight {
+  background: linear-gradient(145deg, rgba(34,197,94,0.08), transparent);
+}
+
 .dash-card .card-header {
   display: flex;
   justify-content: space-between;
@@ -626,7 +641,7 @@ body {
 
 .ring-fg {
   fill: none;
-  stroke: #22c55e;
+  stroke: currentColor;
   stroke-width: 6;
   stroke-dasharray: 283;
   stroke-dashoffset: 283;
@@ -722,12 +737,12 @@ body {
 
 .styled-input:focus, .styled-input:active {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 10px rgba(74, 136, 255, 0.2);
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.15);
 }
 
 .solid-btn {
-  background: var(--text-primary);
+  background: var(--color-accent-primary);
   color: var(--bg-base);
   border: none;
   padding: 0.7rem 1.5rem;
@@ -740,7 +755,24 @@ body {
 
 .solid-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(255,255,255,0.15);
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+
+.ghost-btn {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.7rem 1.5rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-main);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ghost-btn:hover {
+  background: var(--bg-surface-2);
+  border-color: rgba(255,255,255,0.2);
 }
 
 /* Beautiful Transparent Table */
