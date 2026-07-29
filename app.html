@@ -313,8 +313,33 @@
   <footer class="app-footer"
     style="position: relative; z-index: 10; padding: 60px 40px 40px; margin-top: 60px; background: linear-gradient(to top, rgba(255,255,255,0.02), transparent); border-top: 1px solid var(--border-color);">
     <div class="container"
-      style="display: grid; grid-template-columns: 1fr; gap: 30px; font-size: 0.85rem; text-align: right;">
-      <div style="display: flex; justify-content: flex-end; gap: 40px;">
+      style="display: grid; grid-template-columns: 1fr 2fr; gap: 40px; font-size: 0.85rem;">
+      <!-- Brand: top-left -->
+      <div>
+        <div style="font-size: 1.5rem; font-weight: bold; font-family: var(--font-mono); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+          <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="16" cy="16" r="14" fill="none" stroke="var(--color-accent-primary)" stroke-width="2"/>
+            <circle cx="16" cy="12" r="4" fill="var(--color-accent-primary)"/>
+            <circle cx="10" cy="20" r="2.5" fill="var(--color-accent-primary)"/>
+            <circle cx="22" cy="20" r="2.5" fill="var(--color-accent-primary)"/>
+          </svg>
+          BunkBuddy
+        </div>
+        <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 0.8rem;">Track attendance. Bunk smart.</p>
+        <div style="display: flex; gap: 12px;">
+          <a href="mailto:hello@bunkbuddy.in" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" aria-label="Email us">
+            <i class="ph ph-envelope" style="font-size: 1.1rem;"></i>
+          </a>
+          <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" aria-label="Instagram">
+            <i class="ph ph-instagram-logo" style="font-size: 1.1rem;"></i>
+          </a>
+          <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" aria-label="X / Twitter">
+            <i class="ph ph-x-logo" style="font-size: 1.1rem;"></i>
+          </a>
+        </div>
+      </div>
+      <!-- Company + Legal: top-right -->
+      <div style="display: flex; gap: 40px; justify-content: flex-end;">
         <div>
           <h4 style="margin-bottom: 15px; color: var(--text-primary); font-size: 0.85rem; font-weight: 500;">Company</h4>
           <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px;">
@@ -339,29 +364,9 @@
           </div>
         </div>
       </div>
-      <div>
-        <div style="font-size: 1.5rem; font-weight: bold; font-family: var(--font-mono); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; justify-content: flex-end;">
-          <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="16" cy="16" r="14" fill="none" stroke="var(--color-accent-primary)" stroke-width="2"/>
-            <circle cx="16" cy="12" r="4" fill="var(--color-accent-primary)"/>
-            <circle cx="10" cy="20" r="2.5" fill="var(--color-accent-primary)"/>
-            <circle cx="22" cy="20" r="2.5" fill="var(--color-accent-primary)"/>
-          </svg>
-          BunkBuddy
-        </div>
-        <p style="color: var(--text-secondary); margin-bottom: 8px; font-size: 0.8rem; text-align: right;">Track attendance. Bunk smart.</p>
-        <div style="display: flex; gap: 12px; justify-content: flex-end;">
-          <a href="mailto:hello@bunkbuddy.in" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" aria-label="Email us">
-            <i class="ph ph-envelope" style="font-size: 1.1rem;"></i>
-          </a>
-          <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" aria-label="Instagram">
-            <i class="ph ph-instagram-logo" style="font-size: 1.1rem;"></i>
-          </a>
-          <a href="#" style="color: var(--text-secondary); text-decoration: none; transition: color 0.2s;" aria-label="X / Twitter">
-            <i class="ph ph-x-logo" style="font-size: 1.1rem;"></i>
-          </a>
-        </div>
-        <p style="color: var(--text-secondary);">&copy; 2026 Bunkbuddy.in . All rights reserved.</p>
+      <!-- Copyright: bottom, full width -->
+      <div style="grid-column: 1 / -1; text-align: center; padding-top: 20px; border-top: 1px solid var(--border-color); margin-top: 10px;">
+        <p style="color: var(--text-secondary); font-size: 0.75rem;">&copy; 2026 Bunkbuddy.in . All rights reserved.</p>
       </div>
     </div>
   </footer>

@@ -124,9 +124,15 @@
     gap: 2rem !important;
     text-align: left !important;
   }
-  .app-footer .container > div:first-child {
+  .app-footer .container > div:nth-child(1) {
+    margin-bottom: 2rem;
+  }
+  .app-footer .container > div:nth-child(2) {
     flex-direction: column !important;
     gap: 2rem !important;
+  }
+  .app-footer .container > div:last-child {
+    margin-top: 2rem;
   }
 
   /* Pro pricing card */
