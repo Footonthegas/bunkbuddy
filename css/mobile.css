@@ -120,19 +120,9 @@
 
   /* Footer stacks */
   .app-footer .container {
-    grid-template-columns: 1fr !important;
-    gap: 2rem !important;
-    text-align: left !important;
-  }
-  .app-footer .container > div:nth-child(1) {
-    margin-bottom: 2rem;
-  }
-  .app-footer .container > div:nth-child(2) {
     flex-direction: column !important;
     gap: 2rem !important;
-  }
-  .app-footer .container > div:last-child {
-    margin-top: 2rem;
+    text-align: center !important;
   }
 
   /* Pro pricing card */
