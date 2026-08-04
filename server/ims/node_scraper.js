@@ -32,12 +32,6 @@ function classifyTimelineStatus(raw) {
   return '';
 }
 
-function extractSelectValue(html, selectName) {
-  const re = new RegExp(`name='${selectName}' id='${selectName}' value='([^']+)'`);
-  const match = html.match(re);
-  return match ? match[1] : '';
-}
-
 function extractTimeline(html) {
   const $ = cheerio.load(html);
   const timeline = {};
@@ -217,20 +211,39 @@ async function solveCaptcha(captchaBytes) {
   });
 }
 
+function getInputValue($, selector) {
+  const el = $(selector);
+  return el.attr('value') || el.val() || '';
+}
+
+function getLinkHref($, linkText) {
+  const lowerLinkText = linkText.toLowerCase();
+  let foundHref = '';
+  $('a').each((_, el) => {
+    const text = $(el).text().trim().toLowerCase();
+    if (text === lowerLinkText || text.includes(lowerLinkText)) {
+      foundHref = $(el).attr('href') || '';
+      return false;
+    }
+  });
+  return foundHref;
+}
+
 async function loginToIms(rollNumber, password) {
   const session = await client.get('/student_login.php');
   const html = session.data;
+  const $ = cheerio.load(html);
 
-  const fyMatch = html.match(/name='fy' id='fy' value='([^']+)'/);
-  const compMatch = html.match(/name='comp' id='comp' type='hidden' readonly value='([^']+)'/);
-  const hrandMatch = html.match(/name='HRAND_NUM' id='HRAND_NUM' value='([^']+)'/);
-  const capsrcMatch = html.match(/<img src='([^']+captcha[^']+)' id='captchaimg'/);
+  const fy = getInputValue($, "input[name='fy']");
+  const comp = getInputValue($, "input[name='comp']");
+  const hrand = getInputValue($, "input[name='HRAND_NUM']");
+  const captchaImg = $("img[id='captchaimg']").attr('src');
 
-  if (!fyMatch || !compMatch || !hrandMatch || !capsrcMatch) {
+  if (!fy || !comp || !hrand || !captchaImg) {
     throw new Error('Login form not found');
   }
 
-  const captchaUrl = IMS_BASE + capsrcMatch[1];
+  const captchaUrl = IMS_BASE + captchaImg;
   const captchaResp = await client.get(captchaUrl, { responseType: 'arraybuffer' });
   const captchaText = await solveCaptcha(captchaResp.data);
 
@@ -242,9 +255,9 @@ async function loginToIms(rollNumber, password) {
   formData.append('f', '');
   formData.append('uid', rollNumber);
   formData.append('pwd', password);
-  formData.append('HRAND_NUM', hrandMatch[1]);
-  formData.append('fy', fyMatch[1]);
-  formData.append('comp', compMatch[1]);
+  formData.append('HRAND_NUM', hrand);
+  formData.append('fy', fy);
+  formData.append('comp', comp);
   formData.append('cap', captchaText);
   formData.append('logintype', 'student');
 
@@ -267,50 +280,44 @@ async function loginToIms(rollNumber, password) {
 }
 
 async function navigateToAttendance(year, semester) {
-  // Step 1: Get banner page after login to find My Activities link
   const bannerResp = await client.get('/student_login.php', {
     headers: { 'Referer': IMS_BASE + 'student_login.php' }
   });
-  const bannerHtml = bannerResp.data;
+  const $ = cheerio.load(bannerResp.data);
 
-  const myActivitiesRe = /href='(https:\/\/www\.imsnsit\.org\/imsnsit\/plum_url\.php\?[^']+)'[^>]*>My Activities</;
-  const myActivitiesMatch = bannerHtml.match(myActivitiesRe);
-  if (!myActivitiesMatch) {
+  const myActivitiesHref = getLinkHref($, 'My Activities');
+  if (!myActivitiesHref) {
     throw new Error('My Activities link not found');
   }
 
-  // Step 2: Navigate to My Activities
-  const myActivitiesResp = await client.get(myActivitiesMatch[1], {
+  const myActivitiesResp = await client.get(myActivitiesHref, {
     headers: { 'Referer': IMS_BASE + 'student_login.php' }
   });
-  const menuHtml = myActivitiesResp.data;
+  const $menu = cheerio.load(myActivitiesResp.data);
 
-  // Step 3: Find My Attendance link
-  const attendanceRe = /href='(https:\/\/www\.imsnsit\.org\/imsnsit\/plum_url\.php\?[^']+)'[^>]*>My Attendance</;
-  const attendanceMatch = menuHtml.match(attendanceRe);
-  if (!attendanceMatch) {
+  const attendanceHref = getLinkHref($menu, 'My Attendance');
+  if (!attendanceHref) {
     throw new Error('My Attendance link not found');
   }
 
-  // Step 4: Navigate to My Attendance
-  const attendanceResp = await client.get(attendanceMatch[1], {
-    headers: { 'Referer': myActivitiesMatch[1] }
+  const attendanceResp = await client.get(attendanceHref, {
+    headers: { 'Referer': myActivitiesHref }
   });
   const attendanceHtml = attendanceResp.data;
+  const $att = cheerio.load(attendanceHtml);
 
-  // Step 5: Extract hidden fields and submit year/semester
-  const encYear = extractSelectValue(attendanceHtml, 'enc_year');
-  const encSem = extractSelectValue(attendanceHtml, 'enc_sem');
-  const recentity = attendanceHtml.match(/name=recentitycode value='([^']+)'/);
-  const dept = attendanceHtml.match(/name=dept value='([^']+)'/);
-  const degree = attendanceHtml.match(/name=degree value='([^']+)'/);
+  const encYear = getInputValue($att, "input[name='enc_year']");
+  const encSem = getInputValue($att, "input[name='enc_sem']");
+  const recentity = getInputValue($att, "input[name='recentitycode']");
+  const dept = getInputValue($att, "input[name='dept']");
+  const degree = getInputValue($att, "input[name='degree']");
 
   if (!encYear || !encSem || !recentity || !dept || !degree) {
     throw new Error('Attendance form fields not found');
   }
 
-  const resolvedYear = year || extractSelectValue(attendanceHtml, 'year');
-  const resolvedSemester = semester || extractSelectValue(attendanceHtml, 'sem');
+  const resolvedYear = year || getInputValue($att, "select[name='year']") || '';
+  const resolvedSemester = semester || getInputValue($att, "select[name='sem']") || '';
 
   const formData = new URLSearchParams();
   formData.append('year', resolvedYear);
@@ -318,16 +325,16 @@ async function navigateToAttendance(year, semester) {
   formData.append('sem', resolvedSemester);
   formData.append('enc_sem', encSem);
   formData.append('submit', 'Submit');
-  formData.append('recentitycode', recentity[1]);
-  formData.append('dept', dept[1]);
-  formData.append('degree', degree[1]);
+  formData.append('recentitycode', recentity);
+  formData.append('dept', dept);
+  formData.append('degree', degree);
   formData.append('ename', '');
   formData.append('ecode', '');
 
-  const resultResp = await client.post(attendanceMatch[1], formData.toString(), {
+  const resultResp = await client.post(attendanceHref, formData.toString(), {
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'Referer': attendanceMatch[1],
+      'Referer': attendanceHref,
       'Origin': 'https://www.imsnsit.org',
       'Upgrade-Insecure-Requests': '1',
     }

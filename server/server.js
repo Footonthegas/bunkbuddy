@@ -13,86 +13,21 @@ import { pooledLoginAndScrape, fastRefreshWithCookies, browserPool } from '../ex
 import { scrapeWithNode } from './ims/node_scraper.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const RESULTHUB_SCRIPT = path.join(__dirname, 'ims', 'resulthub_scraper.py');
 
-async function fetchResultHubPython(rollNumber) {
-  return new Promise((resolve) => {
-    const pyCmd = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
-    const args = [RESULTHUB_SCRIPT, rollNumber];
-    const proc = spawn(pyCmd, args, { windowsHide: true });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', (d) => { stdout += d.toString(); });
-    proc.stderr.on('data', (d) => { stderr += d.toString(); });
-
-    proc.on('error', () => resolve({ success: false, history: {} }));
-
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        return resolve({ success: false, history: {} });
-      }
-      try {
-        const json = JSON.parse(stdout.trim());
-        resolve(json);
-      } catch (e) {
-        resolve({ success: false, history: {} });
-      }
-    });
-  });
-}
-
-async function fetchResultHubGo(rollNumber) {
-  if (!RESULTHUB_GO_BIN) return { success: false, history: {} };
+async function fetchResultHubNode(rollNumber) {
   try {
-    await fs.promises.chmod(RESULTHUB_GO_BIN, 0o755);
+    const profile = await fetchStudentDetailedProfile(rollNumber);
+    if (profile && profile.success && profile.history) {
+      return { success: true, history: profile.history };
+    }
   } catch (e) {
-    console.error('[RESULT-HUB] Could not set execute permission on Go binary:', e.message);
+    console.error('[RESULT-HUB] Node.js fetch failed:', e.message);
   }
-  return new Promise((resolve) => {
-    const args = ['--resulthub', rollNumber];
-    const proc = spawn(RESULTHUB_GO_BIN, args, { windowsHide: true });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', (d) => { stdout += d.toString(); });
-    proc.stderr.on('data', (d) => { stderr += d.toString(); });
-
-    proc.on('error', () => resolve({ success: false, history: {} }));
-
-    proc.on('close', (code) => {
-      if (code !== 0) {
-        return resolve({ success: false, history: {} });
-      }
-      try {
-        const json = JSON.parse(stdout.trim());
-        if (json.status === 'success' && json.cgpa) {
-          resolve({ success: true, history: json });
-        } else {
-          resolve({ success: false, history: {} });
-        }
-      } catch (e) {
-        resolve({ success: false, history: {} });
-      }
-    });
-  });
+  return { success: false, history: {} };
 }
 
 let enableExperimentalScraper = false;
 
-const ROOT = path.join(__dirname, '..');
-const RESULTHUB_GO_BIN = process.env.RESULTHUB_GO_BIN || (() => {
-  const candidates = [
-    path.join(ROOT, 'fast_scraper_go', 'fast_scraper_go.exe'),
-    path.join(ROOT, 'fast_scraper_go', 'fast_scraper_go'),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  return null;
-})();
 const PORT = process.env.PORT || 3001;
 
 // ── Start ddddocr OCR microservice (optional, silent if unavailable) ─────────
@@ -235,11 +170,22 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
     const normalized = result.data;
     const sessionId = uuidv4();
+    
+    let history = null;
+    try {
+      const rh = await fetchResultHubNode(rollNumber);
+      if (rh && rh.success) {
+        history = rh.history;
+      }
+    } catch (e) {
+      console.error('[LOGIN] ResultHub fetch failed:', e.message);
+    }
+    
     const sessionPayload = {
       sessionId,
       rollNumber,
       data: normalized,
-      history: null,
+      history,
       cookies: [],
       cookieJar: null,
       password: password,
@@ -256,7 +202,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       sessionId,
       rollNumber,
       data: normalized,
-      history: null,
+      history,
       mode: 'node-scraper'
     });
   } catch (err) {
@@ -293,7 +239,7 @@ app.post('/api/academics/history', async (req, res) => {
   }
 
   try {
-    const rh = await fetchResultHubGo(session.rollNumber);
+    const rh = await fetchResultHubNode(session.rollNumber);
     if (rh && rh.success && rh.history) {
       session.history = rh.history;
       return res.json({ success: true, history: rh.history, cached: false });
