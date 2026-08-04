@@ -18,48 +18,47 @@ class BrowserPoolManager {
 
         this.isInitializing = true;
         this.initPromise = (async () => {
+            console.log('[BROWSER-POOL] Launching warm Puppeteer browser...');
+            const launchOpts = {
+                headless: "new",
+                args: [
+                    '--no-sandbox', 
+                    '--disable-setuid-sandbox', 
+                    '--disable-gpu',
+                    '--disable-dev-shm-usage', 
+                    '--window-position=-32000,-32000',
+                    '--disable-background-networking',
+                    '--disable-sync',
+                    '--disable-extensions',
+                    '--no-first-run',
+                    '--no-default-browser-check',
+                    '--disable-translate',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding'
+                ]
+            };
+            if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+                launchOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+            }
             try {
-                console.log('[BROWSER-POOL] Launching warm Puppeteer browser...');
-                const launchOpts = {
-                    headless: "new",
-                    args: [
-                        '--no-sandbox', 
-                        '--disable-setuid-sandbox', 
-                        '--disable-gpu',
-                        '--disable-dev-shm-usage', 
-                        '--window-position=-32000,-32000',
-                        '--disable-background-networking',
-                        '--disable-sync',
-                        '--disable-extensions',
-                        '--no-first-run',
-                        '--no-default-browser-check',
-                        '--disable-translate',
-                        '--disable-background-timer-throttling',
-                        '--disable-backgrounding-occluded-windows',
-                        '--disable-renderer-backgrounding'
-                    ]
-                };
-                if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-                    launchOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+                this.browser = await puppeteer.launch(launchOpts);
+                this.browser.on('disconnected', () => { this.browser = null; });
+                this.isInitializing = false;
+                return this.browser;
+            } catch (err) {
+                if (err.message && err.message.includes('Could not find Chrome')) {
+                    console.log('[BROWSER-POOL] Chrome not available on this instance, browser pool disabled');
+                    this.chromeAvailable = false;
+                } else {
+                    console.error('[BROWSER-POOL] Failed to launch browser:', err.message);
                 }
-                try {
-                    this.browser = await puppeteer.launch(launchOpts);
-                    this.browser.on('disconnected', () => { this.browser = null; });
-                    this.isInitializing = false;
-                    return this.browser;
-                } catch (err) {
-                    if (err.message && err.message.includes('Could not find Chrome')) {
-                        console.log('[BROWSER-POOL] Chrome not available on this instance, browser pool disabled');
-                        this.chromeAvailable = false;
-                    } else {
-                        console.error('[BROWSER-POOL] Failed to launch browser:', err.message);
-                    }
-                    this.isInitializing = false;
-                    return null;
-                }
-            })();
-            return this.initPromise;
-        }
+                this.isInitializing = false;
+                return null;
+            }
+        })();
+        return this.initPromise;
+    }
 
     async closeAll() {
         if (this.browser) { await this.browser.close().catch(() => {}); this.browser = null; }
