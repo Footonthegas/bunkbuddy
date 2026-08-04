@@ -11,6 +11,7 @@ import { scrapeStudentData, fetchResultHubBatch, fetchStudentDetailedProfile } f
 import { sessionCache } from '../experimental/session_cache.js';
 import { pooledLoginAndScrape, fastRefreshWithCookies, browserPool } from '../experimental/browser_pool.js';
 import { scrapeWithNode } from './ims/node_scraper.js';
+import { runGoScraper, normalizeGoResult, isGoScraperAvailable } from './ims/go_scraper.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -153,9 +154,61 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
   let loginFailed = false;
 
-  // Use Node.js scraper directly (no Go binary needed)
+  // Try Go Scraper first, fall back to Node.js scraper
   try {
-    console.log(`[LOGIN] Attempting Node.js Scraper for ${rollNumber}...`);
+    if (isGoScraperAvailable()) {
+      console.log(`[LOGIN] Attempting Go Scraper for ${rollNumber}...`);
+      
+      const goJson = await runGoScraper(rollNumber, password, year, semester);
+      const normalized = normalizeGoResult(goJson);
+
+      const sessionId = uuidv4();
+      
+      let history = null;
+      try {
+        const rh = await fetchResultHubNode(rollNumber);
+        if (rh && rh.success) {
+          history = rh.history;
+        }
+      } catch (e) {
+        console.error('[LOGIN] ResultHub fetch failed:', e.message);
+      }
+      
+      const sessionPayload = {
+        sessionId,
+        rollNumber,
+        data: normalized,
+        history,
+        cookies: [],
+        cookieJar: null,
+        password: password,
+        semester: semester || '1',
+        year: year || '2026-27'
+      };
+
+      sessions.set(sessionId, sessionPayload);
+      sessionCache.setSession(rollNumber, sessionPayload, semester, year);
+
+      console.log(`[LOGIN] ✅ Go scraper completed for ${rollNumber} (${normalized.attendance.length} subjects)!`);
+      return res.json({
+        success: true,
+        sessionId,
+        rollNumber,
+        data: normalized,
+        history,
+        mode: 'go-scraper'
+      });
+    }
+  } catch (goErr) {
+    if (goErr.message && goErr.message.includes('Invalid roll number or password')) {
+      loginFailed = true;
+    }
+    console.error(`[LOGIN] ❌ Go scraper failed for ${rollNumber}: ${goErr.message}`);
+  }
+
+  // Fallback to Node.js scraper
+  try {
+    console.log(`[LOGIN] Falling back to Node.js Scraper for ${rollNumber}...`);
     
     const result = await scrapeWithNode(rollNumber, password, year, semester);
     
@@ -281,7 +334,27 @@ app.post('/api/data/refresh', async (req, res) => {
 
     let refreshLoginFailed = false;
 
+    // Try Go Scraper first, fall back to Node.js scraper
     try {
+      if (isGoScraperAvailable()) {
+        console.log(`[REFRESH] Attempting Go Scraper for ${session.rollNumber}...`);
+        const goJson = await runGoScraper(session.rollNumber, pwd, targetYear, targetSem);
+        const normalized = normalizeGoResult(goJson);
+        session.data = normalized;
+        session.year = targetYear;
+        session.semester = targetSem;
+        res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'go-refresh' });
+        return;
+      }
+    } catch (goErr) {
+      if (goErr.message && goErr.message.includes('Invalid roll number or password')) {
+        refreshLoginFailed = true;
+      }
+      console.error(`[REFRESH] Go scraper failed for ${session.rollNumber}: ${goErr.message}`);
+    }
+
+    try {
+      console.log(`[REFRESH] Falling back to Node.js Scraper for ${session.rollNumber}...`);
       const result = await scrapeWithNode(session.rollNumber, pwd, targetYear, targetSem);
       
       if (result.status === 'error') {
@@ -382,7 +455,8 @@ app.get('/api/history/:roll', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`BunkBuddy server running at http://localhost:${PORT}`);
-  console.log(`[SERVER] Scraper: Node.js + ddddocr (Python)`);
+  console.log(`[SERVER] Go scraper: ${isGoScraperAvailable() ? 'ENABLED ⚡' : 'DISABLED (binary not found)'}`);
+  console.log(`[SERVER] Fallback: Node.js + ddddocr (Python)`);
   if (enableExperimentalScraper) {
     console.log('[SERVER] Pre-warming browser pool...');
     browserPool.getBrowser().then((browser) => {
