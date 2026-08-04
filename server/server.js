@@ -257,103 +257,21 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       if (goErr.message.includes('Invalid roll number or password')) {
         loginFailed = true;
       }
-      goError = goErr.message;
-      console.warn(`[FALLBACK] Go scraper: ${goErr.message}. Falling back...`);
-      console.error('[FALLBACK-DEBUG] Full Go scraper error:', goErr);
-    }
-  }
-
-  // 3. Attempt Experimental Fast Scraper if enabled
-  if (enableExperimentalScraper && browserPool.chromeAvailable) {
-    try {
-      console.log(`[LOGIN] Attempting Experimental Pooled Login+Scrape for ${rollNumber}...`);
-      
-      const result = await pooledLoginAndScrape(rollNumber, password, year, semester);
-
-      const sessionId = uuidv4();
-      const sessionPayload = {
-        sessionId,
-        rollNumber: result.rollNumber,
-        data: result.data,
-        history: result.history,
-        cookies: result.cookies || [],
-        cookieJar: result.cookieJar || null,
-        password: password,
-        semester,
-        year
-      };
-
-      sessions.set(sessionId, sessionPayload);
-      sessionCache.setSession(rollNumber, sessionPayload, semester, year);
-
-      console.log(`[LOGIN] ✅ Experimental scraper completed for ${rollNumber} (${result.data.attendance.length} subjects)!`);
-      return res.json({
-        success: true,
-        sessionId,
-        rollNumber: sessionPayload.rollNumber,
-        data: sessionPayload.data,
-        history: sessionPayload.history,
-        mode: 'experimental-fast',
-        goError
-      });
-    } catch (expErr) {
-      if (expErr.message.includes('Invalid roll number or password')) {
-        loginFailed = true;
-      }
-      experimentalError = expErr.message;
-      console.warn(`[FALLBACK] Experimental scraper: ${expErr.message}. Falling back to legacy Puppeteer...`);
-      console.error('[FALLBACK-DEBUG] Full experimental error:', expErr);
-    }
-  }
-
-  // 3. Legacy Puppeteer Scraper (Fallback or Default)
-  let browserToClose = null;
-  if (browserPool.chromeAvailable) {
-    try {
-      const result = await loginToIms(rollNumber, password);
-      browserToClose = result.browser;
-
-      if (!result.success) {
-        if (result.message && result.message.includes('Invalid roll number or password')) {
-          loginFailed = true;
-        }
-        const status = loginFailed ? 401 : 500;
-        return res.status(status).json({ success: false, message: result.message || 'Login failed.', goError, experimentalError });
-      }
-
-      const data = await scrapeStudentData(result.page, result.browser, year, semester, rollNumber);
-      
-      const sessionId = uuidv4();
-      sessions.set(sessionId, { data, rollNumber, history: null, semester, year, password });
-
-      res.json({
-        success: true,
-        sessionId,
-        rollNumber,
-        data,
-        history: null,
-        mode: 'legacy-puppeteer',
-        experimentalError,
-        goError
-      });
-    } catch (err) {
-      console.error('Login error:', err.message);
-      if (err.message.includes('Invalid roll number or password')) {
-        loginFailed = true;
-      }
-      const status = loginFailed ? 401 : 500;
-      res.status(status).json({
+      console.error(`[LOGIN] ❌ Go scraper failed for ${rollNumber}: ${goErr.message}`);
+      return res.status(loginFailed ? 401 : 500).json({
         success: false,
-        message: loginFailed ? 'Invalid roll number or password.' : (err.message || 'Could not connect to IMS NSUT.'),
-        goError,
-        experimentalError
+        message: loginFailed ? 'Invalid roll number or password.' : (goErr.message || 'Scraper failed. Please try again.'),
+        goError: goErr.message
       });
-    } finally {
-      if (browserToClose) {
-        await browserToClose.close().catch(() => {});
-      }
     }
   }
+
+  // If Go scraper is not available, return error immediately
+  return res.status(500).json({
+    success: false,
+    message: 'Scraper not available on this instance. Please contact support.',
+    goError: 'Go scraper binary not found'
+  });
 });
 
 app.post('/api/config/toggle-experimental', (req, res) => {
@@ -426,10 +344,8 @@ app.post('/api/data/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Password not stored. Please log in again.' });
     }
 
-    let goRefreshError = null;
     let refreshLoginFailed = false;
 
-    // 1. Try Go Scraper first
     if (enableGoScraper && isGoScraperAvailable()) {
       try {
         const goJson = await runGoScraper(session.rollNumber, pwd, targetYear, targetSem);
@@ -444,79 +360,19 @@ app.post('/api/data/refresh', async (req, res) => {
         if (goErr.message.includes('Invalid roll number or password')) {
           refreshLoginFailed = true;
         }
-        goRefreshError = goErr.message;
-        console.warn(`[REFRESH-FALLBACK] Go scraper: ${goErr.message}. Trying experimental...`);
-      }
-    }
-
-    // 2. Try Experimental Scraper
-    let result;
-    try {
-      result = await pooledLoginAndScrape(session.rollNumber, pwd, targetYear, targetSem);
-    } catch (expErr) {
-      if (expErr.message.includes('Invalid roll number or password')) {
-        refreshLoginFailed = true;
-      }
-      console.warn(`[REFRESH-FALLBACK] Experimental refresh: ${expErr.message}. Falling back to legacy Puppeteer...`);
-    }
-
-    if (result) {
-      session.data = result.data;
-      session.history = result.history;
-      session.cookies = result.cookies || [];
-      session.year = targetYear;
-      session.semester = targetSem;
-      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'experimental-full-refresh', goRefreshError });
-      return;
-    }
-
-    // 3. Legacy Puppeteer Fallback
-    let browserToClose = null;
-    if (browserPool.chromeAvailable) {
-      try {
-        const legacyResult = await loginToIms(session.rollNumber, pwd);
-        browserToClose = legacyResult.browser;
-
-        if (!legacyResult.success) {
-          if (legacyResult.message && legacyResult.message.includes('Invalid roll number or password')) {
-            refreshLoginFailed = true;
-          }
-          const status = refreshLoginFailed ? 401 : 500;
-          return res.status(status).json({ success: false, message: refreshLoginFailed ? 'Invalid roll number or password.' : (legacyResult.message || 'Login failed.'), goRefreshError });
-        }
-
-        const data = await scrapeStudentData(legacyResult.page, legacyResult.browser, targetYear, targetSem, session.rollNumber);
-        
-        let history = null;
-        try {
-          const rh = await fetchResultHubGo(session.rollNumber);
-          if (rh && rh.success && rh.history) {
-            history = rh.history;
-          }
-        } catch(e) { }
-        
-        session.data = data;
-        session.history = history;
-        session.cookies = [];
-        session.year = targetYear;
-        session.semester = targetSem;
-        res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'legacy-puppeteer', goRefreshError });
-      } catch (err) {
-        console.error('Refresh error:', err.message);
-        if (err.message.includes('Invalid roll number or password')) {
-          refreshLoginFailed = true;
-        }
+        console.error(`[REFRESH] Go scraper failed for ${session.rollNumber}: ${goErr.message}`);
         const status = refreshLoginFailed ? 401 : 500;
-        res.status(status).json({
+        return res.status(status).json({
           success: false,
-          message: refreshLoginFailed ? 'Invalid roll number or password.' : (err.message || 'Could not connect to IMS NSUT.'),
+          message: refreshLoginFailed ? 'Invalid roll number or password.' : (goErr.message || 'Refresh failed. Please try again.'),
         });
-      } finally {
-        if (browserToClose) {
-          await browserToClose.close().catch(() => {});
-        }
       }
     }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Scraper not available on this instance. Please contact support.',
+    });
   } catch (err) {
     console.error('Refresh error:', err.message);
     res.status(500).json({
