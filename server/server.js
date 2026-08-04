@@ -307,11 +307,6 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
   }
 
   // 3. Legacy Puppeteer Scraper (Fallback or Default)
-  if (!ocrReady) {
-    for (let i = 0; i < 20 && !ocrReady; i++) await new Promise(r => setTimeout(r, 500));
-    if (!ocrReady) return res.status(503).json({ success: false, message: 'OCR service is starting up. Try again in a few seconds.' });
-  }
-
   let browserToClose = null;
   try {
     const result = await loginToIms(rollNumber, password);
@@ -475,11 +470,6 @@ app.post('/api/data/refresh', async (req, res) => {
 
     // 3. Legacy Puppeteer Fallback
     let browserToClose = null;
-    if (!ocrReady) {
-      for (let i = 0; i < 20 && !ocrReady; i++) await new Promise(r => setTimeout(r, 500));
-      if (!ocrReady) return res.status(503).json({ success: false, message: 'OCR service is starting up. Try again in a few seconds.' });
-    }
-
     try {
       const legacyResult = await loginToIms(session.rollNumber, pwd);
       browserToClose = legacyResult.browser;
