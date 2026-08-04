@@ -91,26 +91,36 @@ const RESULTHUB_GO_BIN = process.env.RESULTHUB_GO_BIN || (() => {
 })();
 const PORT = process.env.PORT || 3001;
 
-// ── Start ddddocr OCR microservice ──────────────────────────────────────────
+// ── Start ddddocr OCR microservice (optional) ───────────────────────────────
 let ocrReady = false;
 const ocrServicePath = path.join(__dirname, 'ims', 'ocr_service.py');
 const pythonCmd = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 const ocrProc = spawn(pythonCmd, [ocrServicePath], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 ocrProc.stdout.on('data', d => {
   const msg = d.toString();
-  process.stdout.write('[OCR] ' + msg);
-  if (msg.includes('Listening')) ocrReady = true;
+  if (msg.includes('Listening')) {
+    ocrReady = true;
+    console.log('[OCR] Service ready');
+  }
 });
 ocrProc.stderr.on('data', d => {
   const msg = d.toString();
   if (msg.includes('GetGpuDevices') || msg.includes('device_discovery.cc')) return;
-  process.stderr.write('[OCR] ' + msg);
+  if (msg.includes('No module named')) {
+    console.log('[OCR] ddddocr not installed, OCR fallback disabled');
+    ocrReady = false;
+    return;
+  }
 });
-ocrProc.on('exit', code => { console.log(`[OCR] Service exited with code ${code}`); ocrReady = false; });
-ocrProc.on('error', err => { console.error('[OCR] Failed to start:', err.message); ocrReady = false; });
-// Cleanup OCR on exit
-process.on('exit', () => ocrProc.kill());
-process.on('SIGINT', () => { ocrProc.kill(); process.exit(); });
+ocrProc.on('exit', code => { 
+  if (code !== 0) console.log('[OCR] Service unavailable, using fallback captcha solver');
+  ocrReady = false; 
+});
+ocrProc.on('error', () => { 
+  ocrReady = false; 
+});
+process.on('exit', () => { if (ocrProc) ocrProc.kill(); });
+process.on('SIGINT', () => { if (ocrProc) ocrProc.kill(); process.exit(); });
 // ────────────────────────────────────────────────────────────────────────────
 
 const app = express();
@@ -593,10 +603,14 @@ app.listen(PORT, () => {
   console.log(`[SERVER] Go scraper: ${enableGoScraper && isGoScraperAvailable() ? 'ENABLED ⚡' : 'DISABLED'}`);
   if (enableExperimentalScraper) {
     console.log('[SERVER] Pre-warming browser pool...');
-    browserPool.getBrowser().then(() => {
-      console.log('[SERVER] Browser pool warm and ready.');
+    browserPool.getBrowser().then((browser) => {
+      if (browser) {
+        console.log('[SERVER] Browser pool warm and ready.');
+      } else {
+        console.log('[SERVER] Browser pool not available, using Go scraper only.');
+      }
     }).catch(e => {
-      console.warn('[SERVER] Browser pool warm-up failed:', e.message);
+      console.log('[SERVER] Browser pool skipped:', e.message);
     });
   }
 });
