@@ -229,21 +229,56 @@ function getLinkHref($, linkText) {
   return foundHref;
 }
 
+function extractWithFallback(html, patterns) {
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) return match[1];
+  }
+  return '';
+}
+
 async function loginToIms(rollNumber, password) {
   const session = await client.get('/student_login.php');
   const html = session.data;
+
+  let fy = '', comp = '', hrand = '', captchaImg = '';
+
   const $ = cheerio.load(html);
 
-  const fy = getInputValue($, "input[name='fy']");
-  const comp = getInputValue($, "input[name='comp']");
-  const hrand = getInputValue($, "input[name='HRAND_NUM']");
-  const captchaImg = $("img[id='captchaimg']").attr('src');
+  fy = $("input[name='fy']").attr('value') || $('input#fy').attr('value') || '';
+  comp = $("input[name='comp']").attr('value') || $('input#comp').attr('value') || '';
+  hrand = $("input[name='HRAND_NUM']").attr('value') || $('input#HRAND_NUM').attr('value') || '';
+  captchaImg = $("img[id='captchaimg']").attr('src') || $("img[src*='captcha']").attr('src') || '';
 
   if (!fy || !comp || !hrand || !captchaImg) {
-    throw new Error('Login form not found');
+    const fyRe = /name=['"]?fy['"]?\s+(?:id=['"]?fy['"]?\s+)?value=['"]([^'"]+)['"]/i;
+    const compRe = /name=['"]?comp['"]?\s+(?:id=['"]?comp['"]?\s+)?(?:type=['"]hidden['"]\s+)?(?:readonly\s+)?value=['"]([^'"]+)['"]/i;
+    const hrandRe = /name=['"]?HRAND_NUM['"]?\s+(?:id=['"]?HRAND_NUM['"]?\s+)?value=['"]([^'"]+)['"]/i;
+    const capsrcRe = /<img[^>]+src=['"]([^'"]*captcha[^'"]*)['"][^>]*id=['"]?captchaimg['"]?/i;
+
+    const fyMatch = html.match(fyRe);
+    const compMatch = html.match(compRe);
+    const hrandMatch = html.match(hrandRe);
+    const capsrcMatch = html.match(capsrcRe);
+
+    if (!fyMatch && !compMatch && !hrandMatch) {
+      console.error('[LOGIN] HTML snippet:', html.substring(0, 2000));
+      throw new Error('Login form not found: missing fy/comp/HRAND_NUM');
+    }
+
+    fy = fyMatch ? fyMatch[1] : fy;
+    comp = compMatch ? compMatch[1] : comp;
+    hrand = hrandMatch ? hrandMatch[1] : hrand;
+    captchaImg = capsrcMatch ? capsrcMatch[1] : captchaImg;
   }
 
-  const captchaUrl = IMS_BASE + captchaImg;
+  if (!fy || !comp || !hrand || !captchaImg) {
+    console.error('[LOGIN] Missing fields after fallback:', { fy: !!fy, comp: !!comp, hrand: !!hrand, captchaImg: !!captchaImg });
+    console.error('[LOGIN] HTML length:', html.length);
+    throw new Error('Login form not found: required fields missing after fallback');
+  }
+
+  const captchaUrl = captchaImg.startsWith('http') ? captchaImg : IMS_BASE + captchaImg;
   const captchaResp = await client.get(captchaUrl, { responseType: 'arraybuffer' });
   const captchaText = await solveCaptcha(captchaResp.data);
 
@@ -283,20 +318,40 @@ async function navigateToAttendance(year, semester) {
   const bannerResp = await client.get('/student_login.php', {
     headers: { 'Referer': IMS_BASE + 'student_login.php' }
   });
-  const $ = cheerio.load(bannerResp.data);
+  const bannerHtml = bannerResp.data;
 
-  const myActivitiesHref = getLinkHref($, 'My Activities');
+  let myActivitiesHref = '';
+  const $banner = cheerio.load(bannerHtml);
+  myActivitiesHref = getLinkHref($banner, 'My Activities');
+
   if (!myActivitiesHref) {
+    const myActivitiesRe = /href=['"](https:\/\/www\.imsnsit\.org\/imsnsit\/plum_url\.php\?[^'"]+)['"][^>]*>\s*My Activities\s*</i;
+    const match = bannerHtml.match(myActivitiesRe);
+    if (match) myActivitiesHref = match[1];
+  }
+
+  if (!myActivitiesHref) {
+    console.error('[NAV] My Activities not found. HTML snippet:', bannerHtml.substring(0, 1000));
     throw new Error('My Activities link not found');
   }
 
   const myActivitiesResp = await client.get(myActivitiesHref, {
     headers: { 'Referer': IMS_BASE + 'student_login.php' }
   });
-  const $menu = cheerio.load(myActivitiesResp.data);
+  const menuHtml = myActivitiesResp.data;
 
-  const attendanceHref = getLinkHref($menu, 'My Attendance');
+  let attendanceHref = '';
+  const $menu = cheerio.load(menuHtml);
+  attendanceHref = getLinkHref($menu, 'My Attendance');
+
   if (!attendanceHref) {
+    const attendanceRe = /href=['"](https:\/\/www\.imsnsit\.org\/imsnsit\/plum_url\.php\?[^'"]+)['"][^>]*>\s*My Attendance\s*</i;
+    const match = menuHtml.match(attendanceRe);
+    if (match) attendanceHref = match[1];
+  }
+
+  if (!attendanceHref) {
+    console.error('[NAV] My Attendance not found. HTML snippet:', menuHtml.substring(0, 1000));
     throw new Error('My Attendance link not found');
   }
 
@@ -306,18 +361,52 @@ async function navigateToAttendance(year, semester) {
   const attendanceHtml = attendanceResp.data;
   const $att = cheerio.load(attendanceHtml);
 
-  const encYear = getInputValue($att, "input[name='enc_year']");
-  const encSem = getInputValue($att, "input[name='enc_sem']");
-  const recentity = getInputValue($att, "input[name='recentitycode']");
-  const dept = getInputValue($att, "input[name='dept']");
-  const degree = getInputValue($att, "input[name='degree']");
+  let encYear = getInputValue($att, "input[name='enc_year']");
+  let encSem = getInputValue($att, "input[name='enc_sem']");
+  let recentity = getInputValue($att, "input[name='recentitycode']");
+  let dept = getInputValue($att, "input[name='dept']");
+  let degree = getInputValue($att, "input[name='degree']");
 
   if (!encYear || !encSem || !recentity || !dept || !degree) {
-    throw new Error('Attendance form fields not found');
+    const patterns = {
+      encYear: /name=['"]?enc_year['"]?\s+(?:id=['"]?enc_year['"]?\s+)?value=['"]([^'"]+)['"]/i,
+      encSem: /name=['"]?enc_sem['"]?\s+(?:id=['"]?enc_sem['"]?\s+)?value=['"]([^'"]+)['"]/i,
+      recentity: /name=['"]?recentitycode['"]?\s+(?:id=['"]?recentitycode['"]?\s+)?value=['"]([^'"]+)['"]/i,
+      dept: /name=['"]?dept['"]?\s+(?:id=['"]?dept['"]?\s+)?value=['"]([^'"]+)['"]/i,
+      degree: /name=['"]?degree['"]?\s+(?:id=['"]?degree['"]?\s+)?value=['"]([^'"]+)['"]/i,
+    };
+
+    const encYearMatch = attendanceHtml.match(patterns.encYear);
+    const encSemMatch = attendanceHtml.match(patterns.encSem);
+    const recentityMatch = attendanceHtml.match(patterns.recentity);
+    const deptMatch = attendanceHtml.match(patterns.dept);
+    const degreeMatch = attendanceHtml.match(patterns.degree);
+
+    if (!encYearMatch && !encSemMatch && !recentityMatch) {
+      console.error('[NAV] Attendance form fields not found. HTML snippet:', attendanceHtml.substring(0, 2000));
+      throw new Error('Attendance form fields not found');
+    }
+
+    encYear = encYearMatch ? encYearMatch[1] : encYear;
+    encSem = encSemMatch ? encSemMatch[1] : encSem;
+    recentity = recentityMatch ? recentityMatch[1] : recentity;
+    dept = deptMatch ? deptMatch[1] : dept;
+    degree = degreeMatch ? degreeMatch[1] : degree;
   }
 
-  const resolvedYear = year || getInputValue($att, "select[name='year']") || '';
-  const resolvedSemester = semester || getInputValue($att, "select[name='sem']") || '';
+  if (!encYear || !encSem || !recentity || !dept || !degree) {
+    console.error('[NAV] Missing fields after fallback:', { encYear: !!encYear, encSem: !!encSem, recentity: !!recentity, dept: !!dept, degree: !!degree });
+    throw new Error('Attendance form fields not found: required fields missing after fallback');
+  }
+
+  const resolvedYear = year || extractWithFallback(attendanceHtml, [
+    /name=['"]?year['"]?\s+(?:id=['"]?year['"]?\s+)?value=['"]([^'"]+)['"]/i,
+    /<select[^>]*name=['"]year['"][^>]*>.*?value=['"]([^'"]+)['"]/i
+  ]) || '';
+  const resolvedSemester = semester || extractWithFallback(attendanceHtml, [
+    /name=['"]?sem['"]?\s+(?:id=['"]?sem['"]?\s+)?value=['"]([^'"]+)['"]/i,
+    /<select[^>]*name=['"]sem['"][^>]*>.*?value=['"]([^'"]+)['"]/i
+  ]) || '';
 
   const formData = new URLSearchParams();
   formData.append('year', resolvedYear);
