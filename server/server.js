@@ -91,7 +91,7 @@ const RESULTHUB_GO_BIN = process.env.RESULTHUB_GO_BIN || (() => {
 })();
 const PORT = process.env.PORT || 3001;
 
-// ── Start ddddocr OCR microservice (optional) ───────────────────────────────
+// ── Start ddddocr OCR microservice (optional, silent if unavailable) ─────────
 let ocrReady = false;
 const ocrServicePath = path.join(__dirname, 'ims', 'ocr_service.py');
 const pythonCmd = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
@@ -103,22 +103,9 @@ ocrProc.stdout.on('data', d => {
     console.log('[OCR] Service ready');
   }
 });
-ocrProc.stderr.on('data', d => {
-  const msg = d.toString();
-  if (msg.includes('GetGpuDevices') || msg.includes('device_discovery.cc')) return;
-  if (msg.includes('No module named')) {
-    console.log('[OCR] ddddocr not installed, OCR fallback disabled');
-    ocrReady = false;
-    return;
-  }
-});
-ocrProc.on('exit', code => { 
-  if (code !== 0) console.log('[OCR] Service unavailable, using fallback captcha solver');
-  ocrReady = false; 
-});
-ocrProc.on('error', () => { 
-  ocrReady = false; 
-});
+ocrProc.stderr.on('data', () => {});
+ocrProc.on('exit', () => { ocrReady = false; });
+ocrProc.on('error', () => { ocrReady = false; });
 process.on('exit', () => { if (ocrProc) ocrProc.kill(); });
 process.on('SIGINT', () => { if (ocrProc) ocrProc.kill(); process.exit(); });
 // ────────────────────────────────────────────────────────────────────────────
