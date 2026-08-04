@@ -80,6 +80,7 @@ function saveHolidays() {
 // ────────────────────────────────────────────────────────────────────────────
 
 // Only serve the retro terminal frontend, hide backend source files
+const ROOT = path.join(__dirname, '..');
 app.use(express.static(path.join(ROOT, 'frontend')));
 
 // Explicit routes for SPA-like navigation
