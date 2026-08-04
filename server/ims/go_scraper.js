@@ -69,7 +69,8 @@ export async function runGoScraper(rollNumber, password, year, semester) {
 
       const trimmed = stdout.trim();
       if (!trimmed) {
-        reject(new Error('Go scraper returned empty output'));
+        const errMsg = stderr.trim() || 'No stdout from Go binary';
+        reject(new Error(`Go scraper returned empty output: ${errMsg}`));
         return;
       }
 

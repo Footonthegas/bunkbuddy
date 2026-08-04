@@ -10,7 +10,6 @@ import { loginToIms } from './ims/login.js';
 import { scrapeStudentData, fetchResultHubBatch, fetchStudentDetailedProfile } from './ims/scraper.js';
 import { sessionCache } from '../experimental/session_cache.js';
 import { pooledLoginAndScrape, fastRefreshWithCookies, browserPool } from '../experimental/browser_pool.js';
-import { scrapeWithNode } from './ims/node_scraper.js';
 import { runGoScraper, normalizeGoResult, isGoScraperAvailable } from './ims/go_scraper.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -154,76 +153,12 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
   let loginFailed = false;
 
-  // Try Go Scraper first, fall back to Node.js scraper
   try {
-    if (isGoScraperAvailable()) {
-      console.log(`[LOGIN] Attempting Go Scraper for ${rollNumber}...`);
-      
-      const goJson = await runGoScraper(rollNumber, password, year, semester);
-      const normalized = normalizeGoResult(goJson);
-
-      const sessionId = uuidv4();
-      
-      let history = null;
-      try {
-        const rh = await fetchResultHubNode(rollNumber);
-        if (rh && rh.success) {
-          history = rh.history;
-        }
-      } catch (e) {
-        console.error('[LOGIN] ResultHub fetch failed:', e.message);
-      }
-      
-      const sessionPayload = {
-        sessionId,
-        rollNumber,
-        data: normalized,
-        history,
-        cookies: [],
-        cookieJar: null,
-        password: password,
-        semester: semester || '1',
-        year: year || '2026-27'
-      };
-
-      sessions.set(sessionId, sessionPayload);
-      sessionCache.setSession(rollNumber, sessionPayload, semester, year);
-
-      console.log(`[LOGIN] ✅ Go scraper completed for ${rollNumber} (${normalized.attendance.length} subjects)!`);
-      return res.json({
-        success: true,
-        sessionId,
-        rollNumber,
-        data: normalized,
-        history,
-        mode: 'go-scraper'
-      });
-    }
-  } catch (goErr) {
-    if (goErr.message && goErr.message.includes('Invalid roll number or password')) {
-      loginFailed = true;
-    }
-    console.error(`[LOGIN] ❌ Go scraper failed for ${rollNumber}: ${goErr.message}`);
-  }
-
-  // Fallback to Node.js scraper
-  try {
-    console.log(`[LOGIN] Falling back to Node.js Scraper for ${rollNumber}...`);
+    console.log(`[LOGIN] Attempting Go Scraper for ${rollNumber}...`);
     
-    const result = await scrapeWithNode(rollNumber, password, year, semester);
-    
-    if (result.status === 'error') {
-      if (result.error && result.error.includes('Invalid roll number or password')) {
-        loginFailed = true;
-      }
-      console.error(`[LOGIN] ❌ Node.js scraper failed for ${rollNumber}: ${result.error}`);
-      return res.status(loginFailed ? 401 : 500).json({
-        success: false,
-        message: loginFailed ? 'Invalid roll number or password.' : (result.error || 'Scraper failed. Please try again.'),
-      });
-    }
+    const goJson = await runGoScraper(rollNumber, password, year, semester);
+    const normalized = normalizeGoResult(goJson);
 
-    const normalized = result.data;
     const sessionId = uuidv4();
     
     let history = null;
@@ -251,20 +186,20 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     sessions.set(sessionId, sessionPayload);
     sessionCache.setSession(rollNumber, sessionPayload, semester, year);
 
-    console.log(`[LOGIN] ✅ Node.js scraper completed for ${rollNumber} (${normalized.attendance.length} subjects)!`);
+    console.log(`[LOGIN] ✅ Go scraper completed for ${rollNumber} (${normalized.attendance.length} subjects)!`);
     return res.json({
       success: true,
       sessionId,
       rollNumber,
       data: normalized,
       history,
-      mode: 'node-scraper'
+      mode: 'go-scraper'
     });
   } catch (err) {
     if (err.message && err.message.includes('Invalid roll number or password')) {
       loginFailed = true;
     }
-    console.error(`[LOGIN] ❌ Node.js scraper failed for ${rollNumber}: ${err.message}`);
+    console.error(`[LOGIN] ❌ Go scraper failed for ${rollNumber}: ${err.message}`);
     return res.status(loginFailed ? 401 : 500).json({
       success: false,
       message: loginFailed ? 'Invalid roll number or password.' : (err.message || 'Scraper failed. Please try again.'),
@@ -334,56 +269,24 @@ app.post('/api/data/refresh', async (req, res) => {
 
     let refreshLoginFailed = false;
 
-    // Try Go Scraper first, fall back to Node.js scraper
     try {
-      if (isGoScraperAvailable()) {
-        console.log(`[REFRESH] Attempting Go Scraper for ${session.rollNumber}...`);
-        const goJson = await runGoScraper(session.rollNumber, pwd, targetYear, targetSem);
-        const normalized = normalizeGoResult(goJson);
-        session.data = normalized;
-        session.year = targetYear;
-        session.semester = targetSem;
-        res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'go-refresh' });
-        return;
-      }
+      console.log(`[REFRESH] Attempting Go Scraper for ${session.rollNumber}...`);
+      const goJson = await runGoScraper(session.rollNumber, pwd, targetYear, targetSem);
+      const normalized = normalizeGoResult(goJson);
+      session.data = normalized;
+      session.year = targetYear;
+      session.semester = targetSem;
+      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'go-refresh' });
+      return;
     } catch (goErr) {
       if (goErr.message && goErr.message.includes('Invalid roll number or password')) {
         refreshLoginFailed = true;
       }
       console.error(`[REFRESH] Go scraper failed for ${session.rollNumber}: ${goErr.message}`);
-    }
-
-    try {
-      console.log(`[REFRESH] Falling back to Node.js Scraper for ${session.rollNumber}...`);
-      const result = await scrapeWithNode(session.rollNumber, pwd, targetYear, targetSem);
-      
-      if (result.status === 'error') {
-        if (result.error && result.error.includes('Invalid roll number or password')) {
-          refreshLoginFailed = true;
-        }
-        console.error(`[REFRESH] Node.js scraper failed for ${session.rollNumber}: ${result.error}`);
-        const status = refreshLoginFailed ? 401 : 500;
-        return res.status(status).json({
-          success: false,
-          message: refreshLoginFailed ? 'Invalid roll number or password.' : (result.error || 'Refresh failed. Please try again.'),
-        });
-      }
-
-      const normalized = result.data;
-      session.data = normalized;
-      session.year = targetYear;
-      session.semester = targetSem;
-      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'node-refresh' });
-      return;
-    } catch (err) {
-      if (err.message && err.message.includes('Invalid roll number or password')) {
-        refreshLoginFailed = true;
-      }
-      console.error(`[REFRESH] Node.js scraper failed for ${session.rollNumber}: ${err.message}`);
       const status = refreshLoginFailed ? 401 : 500;
       return res.status(status).json({
         success: false,
-        message: refreshLoginFailed ? 'Invalid roll number or password.' : (err.message || 'Refresh failed. Please try again.'),
+        message: refreshLoginFailed ? 'Invalid roll number or password.' : (goErr.message || 'Refresh failed. Please try again.'),
       });
     }
   } catch (err) {
