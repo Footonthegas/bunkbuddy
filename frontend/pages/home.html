@@ -1,0 +1,93 @@
+<div style="margin-bottom: 16px;">
+  <span class="label">Dashboard</span>
+  <h1 style="font-size: 2rem; margin: 0; font-weight: bold; color: var(--text-bright); text-shadow: 0 0 10px rgba(255,255,255,0.3);">
+    Welcome, <span id="homeGreeting" style="font-weight: normal;">User</span>
+  </h1>
+  <p id="homeSub" style="color: var(--text-dim); margin: 4px 0 0 0; font-size: 0.9rem;">Roll XXXXXXXX</p>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <select id="dashSemInput" class="term-select" style="flex: 1; min-width: 100px;">
+      <option value="1">Sem 1</option><option value="2">Sem 2</option><option value="3">Sem 3</option>
+      <option value="4" selected>Sem 4</option><option value="5">Sem 5</option><option value="6">Sem 6</option>
+      <option value="7">Sem 7</option><option value="8">Sem 8</option>
+    </select>
+    <select id="dashYearInput" class="term-select" style="flex: 1; min-width: 120px;">
+      <option value="2026-27" selected>2026-27</option>
+      <option value="2025-26">2025-26</option>
+      <option value="2024-25">2024-25</option>
+    </select>
+  </div>
+  <button class="term-btn amber" id="refreshAttendanceBtn" style="width: 100%;">
+    [ SYNC DATA ]
+  </button>
+</div>
+
+<div id="refreshStatus" style="margin-bottom: 8px;"></div>
+
+<!-- Subject Cards -->
+<div id="subjectCardsContainer" class="term-grid" style="margin-bottom: 20px;">
+  <div class="term-alert info">Loading subject data...</div>
+</div>
+
+<!-- Timetable Section -->
+<div id="homeTimetableSection" style="display: none; margin-bottom: 20px;">
+  <div class="term-sep"></div>
+  <div style="font-size: 0.8rem; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">
+    <i class="ph ph-clock"></i> Today's Schedule
+  </div>
+  <div id="homeTimetableContainer"></div>
+</div>
+
+<!-- Academic Section -->
+<div id="homeAcademicSection" style="display: none; margin-bottom: 20px;">
+  <div class="term-sep"></div>
+  <div style="font-size: 0.8rem; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">
+    <i class="ph ph-graduation-cap"></i> Academic Overview
+  </div>
+  <div class="term-grid term-grid-3" style="margin-bottom: 16px;">
+    <div class="term-card term-stat">
+      <div class="term-stat-label">Current CGPA</div>
+      <div class="term-stat-value" id="homeCgpa">--</div>
+    </div>
+    <div class="term-card term-stat">
+      <div class="term-stat-label">Dept Rank</div>
+      <div class="term-stat-value" id="homeRank" style="color: var(--accent-cyan);">--</div>
+    </div>
+    <div class="term-card" style="padding: 12px; position: relative;">
+      <div class="term-stat-label" style="margin-bottom: 8px;">SGPA Trend</div>
+      <div style="height: 140px; position: relative;"><canvas id="homeChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Contribute -->
+<div style="margin-bottom: 20px;">
+  <a href="https://razorpay.me/@amanguliani" target="_blank" rel="noopener" class="term-btn amber" style="width: 100%; display: block; text-align: center; text-decoration: none;">
+    [ CONTRIBUTE ]
+  </a>
+</div>
+
+<!-- Logout -->
+<div style="margin-bottom: 20px;">
+  <button class="term-btn danger" id="homeLogoutBtn" style="width: 100%;">
+    [ LOGOUT ]
+  </button>
+</div>
+
+<!-- Calendar Card -->
+<div class="term-card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+    <span style="font-size: 0.8rem; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.1em;">Calendar</span>
+    <div style="display: flex; gap: 4px; align-items: center; font-size: 0.75rem;">
+      <button id="calPrevBtn" class="term-btn" style="padding: 2px 8px; font-size: 0.7rem;">&lt;</button>
+      <span id="calMonthYear" style="font-weight: bold;">--</span>
+      <button id="calNextBtn" class="term-btn" style="padding: 2px 8px; font-size: 0.7rem;">&gt;</button>
+    </div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-size: 0.65rem; color: var(--text-dim); margin-bottom: 4px;">
+    <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+  </div>
+  <div id="calendarGrid" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-size: 0.7rem;"></div>
+</div>

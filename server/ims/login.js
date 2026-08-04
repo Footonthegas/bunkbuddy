@@ -8,7 +8,7 @@ export async function loginToIms(rollNumber, password) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: "shell",
+      headless: "new",
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--window-position=-32000,-32000']
     });
 

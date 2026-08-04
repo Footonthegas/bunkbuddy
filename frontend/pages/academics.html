@@ -1,0 +1,65 @@
+<div style="margin-bottom: 16px;">
+  <span class="label">Academics</span>
+  <h1 style="font-size: 2rem; margin: 0; font-weight: bold; color: var(--text-bright); text-shadow: 0 0 10px rgba(255,255,255,0.3);">Academics</h1>
+  <p style="color: var(--text-dim); margin: 4px 0 0 0; font-size: 0.9rem;">Performance matrix and SGPA trajectory</p>
+</div>
+
+<div class="term-grid term-grid-2" style="margin-bottom: 20px;">
+  <!-- Student Dossier -->
+  <div class="term-card">
+    <div style="padding: 20px; text-align: center;">
+      <h2 id="academicName" style="font-size: 1.4rem; margin: 0 0 4px 0; font-weight: bold; color: #fff;">--</h2>
+      <div id="academicRoll" style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 12px; letter-spacing: 0.1em;">--</div>
+      <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px dashed rgba(255,255,255,0.08);">
+        <div style="font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 4px;">Current CGPA</div>
+        <div id="academicCgpa" style="font-size: 3rem; font-weight: bold; color: #fff; line-height: 1;">--</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; text-align: left;">
+        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 4px; border: 1px solid rgba(255,255,255,0.04);">
+          <span style="color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase;">Program</span>
+          <span style="font-weight: bold; color: #fff;">B.Tech</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 4px; border: 1px solid rgba(255,255,255,0.04);">
+          <span style="color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase;">Branch</span>
+          <span id="academicBranch" style="font-weight: bold; color: var(--accent-cyan); text-align: right;">--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analytics -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <div class="term-grid term-grid-3" style="grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+      <div class="term-card term-stat">
+        <div class="term-stat-label">Uni Rank</div>
+        <div class="term-stat-value" id="academicUniRank" style="font-size: 1.5rem;">--</div>
+      </div>
+      <div class="term-card term-stat">
+        <div class="term-stat-label">Dept Rank</div>
+        <div class="term-stat-value" id="academicDeptRank" style="font-size: 1.5rem; color: var(--accent-cyan);">--</div>
+      </div>
+      <div class="term-card term-stat">
+        <div class="term-stat-label">Credits</div>
+        <div class="term-stat-value" id="academicCredits" style="font-size: 1.5rem;">--</div>
+      </div>
+    </div>
+    <div class="term-card" style="position: relative;">
+      <div style="font-size: 0.8rem; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Performance Trajectory</div>
+      <div style="height: 200px; position: relative;"><canvas id="cgpaTrendChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="term-sep"></div>
+<div style="font-size: 0.8rem; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">
+  Subject Master Log
+</div>
+<div id="semestersGrid" class="term-grid term-grid-2"></div>
+
+<div class="term-sep"></div>
+<div style="font-size: 0.8rem; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">
+  Comparative Benchmark
+</div>
+<div class="term-card" style="position: relative;">
+  <div style="height: 200px;"><canvas id="comparisonChart"></canvas></div>
+</div>

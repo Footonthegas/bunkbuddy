@@ -10,11 +10,85 @@ import { loginToIms } from './ims/login.js';
 import { scrapeStudentData, fetchResultHubBatch, fetchStudentDetailedProfile } from './ims/scraper.js';
 import { sessionCache } from '../experimental/session_cache.js';
 import { pooledLoginAndScrape, fastRefreshWithCookies, browserPool } from '../experimental/browser_pool.js';
-
-let enableExperimentalScraper = true;
+import { runGoScraper, normalizeGoResult, isGoScraperAvailable } from './ims/go_scraper.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const RESULTHUB_SCRIPT = path.join(__dirname, 'ims', 'resulthub_scraper.py');
+
+async function fetchResultHubPython(rollNumber) {
+  return new Promise((resolve) => {
+    const pyCmd = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+    const args = [RESULTHUB_SCRIPT, rollNumber];
+    const proc = spawn(pyCmd, args, { windowsHide: true });
+
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+
+    proc.on('error', () => resolve({ success: false, history: {} }));
+
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        return resolve({ success: false, history: {} });
+      }
+      try {
+        const json = JSON.parse(stdout.trim());
+        resolve(json);
+      } catch (e) {
+        resolve({ success: false, history: {} });
+      }
+    });
+  });
+}
+
+async function fetchResultHubGo(rollNumber) {
+  if (!RESULTHUB_GO_BIN) return { success: false, history: {} };
+  return new Promise((resolve) => {
+    const args = ['--resulthub', rollNumber];
+    const proc = spawn(RESULTHUB_GO_BIN, args, { windowsHide: true });
+
+    let stdout = '';
+    let stderr = '';
+
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+
+    proc.on('error', () => resolve({ success: false, history: {} }));
+
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        return resolve({ success: false, history: {} });
+      }
+      try {
+        const json = JSON.parse(stdout.trim());
+        if (json.status === 'success' && json.cgpa) {
+          resolve({ success: true, history: json });
+        } else {
+          resolve({ success: false, history: {} });
+        }
+      } catch (e) {
+        resolve({ success: false, history: {} });
+      }
+    });
+  });
+}
+
+let enableExperimentalScraper = true;
+let enableGoScraper = true;
+
 const ROOT = path.join(__dirname, '..');
+const RESULTHUB_GO_BIN = process.env.RESULTHUB_GO_BIN || (() => {
+  const candidates = [
+    path.join(ROOT, 'fast_scraper_go', 'fast_scraper_go.exe'),
+    path.join(ROOT, 'fast_scraper_go', 'fast_scraper_go'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+})();
 const PORT = process.env.PORT || 3001;
 
 // ── Start ddddocr OCR microservice ──────────────────────────────────────────
@@ -69,7 +143,12 @@ function saveHolidays() {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-app.use(express.static(ROOT));
+// Only serve the retro terminal frontend, hide backend source files
+app.use(express.static(path.join(ROOT, 'frontend')));
+
+// Explicit routes for SPA-like navigation
+app.get('/', (req, res) => res.sendFile(path.join(ROOT, 'frontend', 'index.html')));
+app.get('/app.html', (req, res) => res.sendFile(path.join(ROOT, 'frontend', 'app.html')));
 
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { rollNumber, password, year, semester } = req.body;
@@ -135,8 +214,54 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
   // Always perform live scrape to return latest attendance data per user request
 
-  // 2. Attempt Experimental Fast Scraper if enabled
+  let goError = null;
   let experimentalError = null;
+  let loginFailed = false;
+
+  // 2. Attempt Go Scraper if enabled
+  if (enableGoScraper && isGoScraperAvailable()) {
+    try {
+      console.log(`[LOGIN] Attempting Go Scraper for ${rollNumber}...`);
+      
+      const goJson = await runGoScraper(rollNumber, password, year, semester);
+      const normalized = normalizeGoResult(goJson);
+
+      const sessionId = uuidv4();
+      const sessionPayload = {
+        sessionId,
+        rollNumber,
+        data: normalized,
+        history: null,
+        cookies: [],
+        cookieJar: null,
+        password: password,
+        semester: semester || '1',
+        year: year || '2026-27'
+      };
+
+      sessions.set(sessionId, sessionPayload);
+      sessionCache.setSession(rollNumber, sessionPayload, semester, year);
+
+      console.log(`[LOGIN] ✅ Go scraper completed for ${rollNumber} (${normalized.attendance.length} subjects)!`);
+      return res.json({
+        success: true,
+        sessionId,
+        rollNumber,
+        data: normalized,
+        history: null,
+        mode: 'go-scraper'
+      });
+    } catch (goErr) {
+      if (goErr.message.includes('Invalid roll number or password')) {
+        loginFailed = true;
+      }
+      goError = goErr.message;
+      console.warn(`[FALLBACK] Go scraper: ${goErr.message}. Falling back...`);
+      console.error('[FALLBACK-DEBUG] Full Go scraper error:', goErr);
+    }
+  }
+
+  // 3. Attempt Experimental Fast Scraper if enabled
   if (enableExperimentalScraper) {
     try {
       console.log(`[LOGIN] Attempting Experimental Pooled Login+Scrape for ${rollNumber}...`);
@@ -166,11 +291,12 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
         rollNumber: sessionPayload.rollNumber,
         data: sessionPayload.data,
         history: sessionPayload.history,
-        mode: 'experimental-fast'
+        mode: 'experimental-fast',
+        goError
       });
     } catch (expErr) {
       if (expErr.message.includes('Invalid roll number or password')) {
-        return res.status(401).json({ success: false, message: 'Invalid roll number or password.' });
+        loginFailed = true;
       }
       experimentalError = expErr.message;
       console.warn(`[FALLBACK] Experimental scraper: ${expErr.message}. Falling back to legacy Puppeteer...`);
@@ -190,39 +316,39 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     browserToClose = result.browser;
 
     if (!result.success) {
-      return res.status(401).json({ success: false, message: result.message || 'Login failed.' });
+      if (result.message && result.message.includes('Invalid roll number or password')) {
+        loginFailed = true;
+      }
+      const status = loginFailed ? 401 : 500;
+      return res.status(status).json({ success: false, message: result.message || 'Login failed.', goError, experimentalError });
     }
 
     const data = await scrapeStudentData(result.page, result.browser, year, semester, rollNumber);
     
-    let history = null;
-    try {
-        const studentProfile = await fetchStudentDetailedProfile(rollNumber, null, result.browser);
-        if (studentProfile && studentProfile.success) {
-            history = studentProfile.history;
-        }
-    } catch(e) {
-        console.error("ResultHub pre-fetch failed silently:", e.message);
-    }
-
     const sessionId = uuidv4();
-    sessions.set(sessionId, { data, rollNumber, history, semester, year, password });
+    sessions.set(sessionId, { data, rollNumber, history: null, semester, year, password });
 
     res.json({
       success: true,
       sessionId,
       rollNumber,
       data,
-      history,
+      history: null,
       mode: 'legacy-puppeteer',
-      experimentalError
+      experimentalError,
+      goError
     });
   } catch (err) {
     console.error('Login error:', err.message);
-    const status = err.message.includes('Invalid') ? 401 : 500;
+    if (err.message.includes('Invalid roll number or password')) {
+      loginFailed = true;
+    }
+    const status = loginFailed ? 401 : 500;
     res.status(status).json({
       success: false,
-      message: err.message || 'Could not connect to IMS NSUT.',
+      message: loginFailed ? 'Invalid roll number or password.' : (err.message || 'Could not connect to IMS NSUT.'),
+      goError,
+      experimentalError
     });
   } finally {
     if (browserToClose) {
@@ -241,19 +367,44 @@ app.post('/api/config/toggle-experimental', (req, res) => {
   res.json({ success: true, experimentalEnabled: enableExperimentalScraper });
 });
 
+app.post('/api/config/toggle-go-scraper', (req, res) => {
+  if (typeof req.body.enabled === 'boolean') {
+    enableGoScraper = req.body.enabled;
+  } else {
+    enableGoScraper = !enableGoScraper;
+  }
+  console.log(`[CONFIG] Go scraper mode: ${enableGoScraper ? 'ENABLED ⚡' : 'DISABLED'}`);
+  res.json({ success: true, goScraperEnabled: enableGoScraper, goScraperAvailable: isGoScraperAvailable() });
+});
+
+app.post('/api/academics/history', async (req, res) => {
+  const { sessionId } = req.body;
+  const session = sessions.get(sessionId);
+  if (!session) {
+    return res.status(401).json({ message: 'Session expired. Please log in again.' });
+  }
+
+  if (session.history && Object.keys(session.history).length > 0) {
+    return res.json({ success: true, history: session.history, cached: true });
+  }
+
+  try {
+    const rh = await fetchResultHubGo(session.rollNumber);
+    if (rh && rh.success && rh.history) {
+      session.history = rh.history;
+      return res.json({ success: true, history: rh.history, cached: false });
+    }
+  } catch (e) {
+    console.error("ResultHub on-demand fetch failed:", e.message);
+  }
+
+  res.json({ success: false, message: 'Failed to fetch academic history.' });
+});
+
 app.get('/api/data', async (req, res) => {
   const session = sessions.get(req.query.sessionId);
   if (!session) {
     return res.status(401).json({ message: 'Session expired. Please log in again.' });
-  }
-  
-  if (!session.history || Object.keys(session.history).length === 0) {
-      try {
-          const profile = await fetchStudentDetailedProfile(session.rollNumber);
-          if (profile && profile.success) {
-              session.history = profile.history;
-          }
-      } catch(e) { }
   }
   
   res.json({ rollNumber: session.rollNumber, data: session.data, history: session.history });
@@ -276,14 +427,38 @@ app.post('/api/data/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Password not stored. Please log in again.' });
     }
 
+    let goRefreshError = null;
+    let refreshLoginFailed = false;
+
+    // 1. Try Go Scraper first
+    if (enableGoScraper && isGoScraperAvailable()) {
+      try {
+        const goJson = await runGoScraper(session.rollNumber, pwd, targetYear, targetSem);
+        const normalized = normalizeGoResult(goJson);
+
+        session.data = normalized;
+        session.year = targetYear;
+        session.semester = targetSem;
+        res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'go-refresh' });
+        return;
+      } catch (goErr) {
+        if (goErr.message.includes('Invalid roll number or password')) {
+          refreshLoginFailed = true;
+        }
+        goRefreshError = goErr.message;
+        console.warn(`[REFRESH-FALLBACK] Go scraper: ${goErr.message}. Trying experimental...`);
+      }
+    }
+
+    // 2. Try Experimental Scraper
     let result;
     try {
       result = await pooledLoginAndScrape(session.rollNumber, pwd, targetYear, targetSem);
     } catch (expErr) {
       if (expErr.message.includes('Invalid roll number or password')) {
-        return res.status(401).json({ success: false, message: 'Invalid roll number or password.' });
+        refreshLoginFailed = true;
       }
-      console.warn(`[FALLBACK] Experimental refresh: ${expErr.message}. Falling back to legacy Puppeteer...`);
+      console.warn(`[REFRESH-FALLBACK] Experimental refresh: ${expErr.message}. Falling back to legacy Puppeteer...`);
     }
 
     if (result) {
@@ -292,10 +467,11 @@ app.post('/api/data/refresh', async (req, res) => {
       session.cookies = result.cookies || [];
       session.year = targetYear;
       session.semester = targetSem;
-      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'experimental-full-refresh' });
+      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'experimental-full-refresh', goRefreshError });
       return;
     }
 
+    // 3. Legacy Puppeteer Fallback
     let browserToClose = null;
     if (!ocrReady) {
       for (let i = 0; i < 20 && !ocrReady; i++) await new Promise(r => setTimeout(r, 500));
@@ -307,31 +483,38 @@ app.post('/api/data/refresh', async (req, res) => {
       browserToClose = legacyResult.browser;
 
       if (!legacyResult.success) {
-        return res.status(401).json({ success: false, message: legacyResult.message || 'Login failed.' });
+        if (legacyResult.message && legacyResult.message.includes('Invalid roll number or password')) {
+          refreshLoginFailed = true;
+        }
+        const status = refreshLoginFailed ? 401 : 500;
+        return res.status(status).json({ success: false, message: refreshLoginFailed ? 'Invalid roll number or password.' : (legacyResult.message || 'Login failed.'), goRefreshError });
       }
 
-      const data = await scrapeStudentData(legacyResult.page, legacyResult.browser, targetYear, targetSem, session.rollNumber);
-      
-      let history = null;
-      try {
-          const studentProfile = await fetchStudentDetailedProfile(session.rollNumber, null, legacyResult.browser);
-          if (studentProfile && studentProfile.success) {
-            history = studentProfile.history;
-          }
-      } catch(e) { }
+    const data = await scrapeStudentData(legacyResult.page, legacyResult.browser, targetYear, targetSem, session.rollNumber);
+    
+    let history = null;
+    try {
+        const rh = await fetchResultHubGo(session.rollNumber);
+        if (rh && rh.success && rh.history) {
+          history = rh.history;
+        }
+    } catch(e) { }
       
       session.data = data;
       session.history = history;
       session.cookies = [];
       session.year = targetYear;
       session.semester = targetSem;
-      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'legacy-puppeteer' });
+      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'legacy-puppeteer', goRefreshError });
     } catch (err) {
       console.error('Refresh error:', err.message);
-      const status = err.message.includes('Invalid') ? 401 : 500;
+      if (err.message.includes('Invalid roll number or password')) {
+        refreshLoginFailed = true;
+      }
+      const status = refreshLoginFailed ? 401 : 500;
       res.status(status).json({
         success: false,
-        message: err.message || 'Could not connect to IMS NSUT.',
+        message: refreshLoginFailed ? 'Invalid roll number or password.' : (err.message || 'Could not connect to IMS NSUT.'),
       });
     } finally {
       if (browserToClose) {
@@ -407,6 +590,7 @@ app.get('/api/history/:roll', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`BunkBuddy server running at http://localhost:${PORT}`);
+  console.log(`[SERVER] Go scraper: ${enableGoScraper && isGoScraperAvailable() ? 'ENABLED ⚡' : 'DISABLED'}`);
   if (enableExperimentalScraper) {
     console.log('[SERVER] Pre-warming browser pool...');
     browserPool.getBrowser().then(() => {

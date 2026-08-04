@@ -1,0 +1,22 @@
+<div style="margin-bottom: 16px;">
+  <span class="label">Attendance</span>
+  <h1 style="font-size: 2rem; margin: 0; font-weight: bold; color: var(--text-bright); text-shadow: 0 0 10px rgba(255,255,255,0.3);">Attendance Log</h1>
+  <p style="color: var(--text-dim); margin: 4px 0 0 0; font-size: 0.9rem;">Subject-wise attendance from IMS NSUT</p>
+</div>
+
+<div style="margin-bottom: 16px;">
+  <button class="term-btn amber" id="attendanceSyncBtn" style="padding: 8px 16px; font-size: 0.85rem;">
+    [ SYNC DATA ]
+  </button>
+  <div id="syncProgressContainer" style="display: none; margin-top: 8px;">
+    <div class="term-progress"><div class="term-progress-fill" id="syncProgressBar" style="width: 0%;"></div></div>
+  </div>
+</div>
+
+<div id="refreshStatus" style="margin-bottom: 8px;"></div>
+<div id="attendanceTable"></div>
+
+<div id="subjectLegend" style="margin-top: 16px; display: none;">
+  <div style="font-size: 0.8rem; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 8px;">Subject Codes</div>
+  <div id="subjectLegendContent" style="display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem;"></div>
+</div>

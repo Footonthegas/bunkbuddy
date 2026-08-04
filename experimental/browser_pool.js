@@ -18,7 +18,7 @@ class BrowserPoolManager {
         this.initPromise = (async () => {
             console.log('[BROWSER-POOL] Launching warm Puppeteer browser...');
             const launchOpts = {
-                headless: "shell",
+                headless: "new",
                 args: [
                     '--no-sandbox', 
                     '--disable-setuid-sandbox', 

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BunkBuddy Terminal</title>
+  <link rel="stylesheet" href="css/terminal.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="device-chassis">
+    <div class="bezel">
+      <div class="brand">BUNKBUDDY // TERMINAL</div>
+      <div class="status-bar">
+        <span class="led active"></span>
+        <span>POWER</span>
+      </div>
+    </div>
+
+    <div class="crt-screen crt-on screen-flicker">
+      <div class="scanlines"></div>
+      <div class="crt-glow"></div>
+      <div class="crt-flicker"></div>
+      <div class="scanline-moving"></div>
+
+      <div class="terminal" id="terminal">
+        <div id="terminalContent">
+          <div class="terminal-line"><span class="prompt">SYS</span> <span class="success">INITIALIZING TERMINAL v2.4.1...</span></div>
+          <div class="terminal-line"><span class="prompt">NET</span> <span class="success">CONNECTION ESTABLISHED</span></div>
+          <div class="terminal-line"><span class="prompt">MEM</span> <span class="dim">64KB OK</span></div>
+           <div class="terminal-line"><span class="prompt">VOL</span> <span class="dim">C:\BUNKBUDDY</span></div>
+           <div class="terminal-line"><span class="bright">BunkBuddy Student Portal</span></div>
+           <div class="terminal-line"><span class="dim">==============================</span></div>
+           <div class="terminal-line"><span class="prompt">LOGIN</span> <span class="warning">Enter credentials to access system</span></div>
+
+           <div class="term-card" style="margin-top: 12px;">
+            <div class="terminal-line" style="margin-bottom: 10px;">
+              <span class="prompt" style="width: 100px; flex-shrink: 0;">ROLL_NO:</span>
+              <input type="text" id="rollInput" class="term-input" placeholder="202XAAA0000" autocomplete="username" style="flex: 1;">
+            </div>
+            <div class="terminal-line" style="margin-bottom: 10px;">
+              <span class="prompt" style="width: 100px; flex-shrink: 0;">PASSWORD:</span>
+              <input type="password" id="passInput" class="term-input" placeholder="********" autocomplete="current-password" style="flex: 1;">
+            </div>
+            <div class="terminal-line" style="margin-bottom: 10px;">
+              <span class="prompt" style="width: 100px; flex-shrink: 0;">SEMESTER:</span>
+              <select id="semInput" class="term-select" style="flex: 1;">
+                <option value="1">Semester 1</option>
+                <option value="2">Semester 2</option>
+                <option value="3">Semester 3</option>
+                <option value="4" selected>Semester 4</option>
+                <option value="5">Semester 5</option>
+                <option value="6">Semester 6</option>
+                <option value="7">Semester 7</option>
+                <option value="8">Semester 8</option>
+              </select>
+            </div>
+            <div class="terminal-line" style="margin-bottom: 10px;">
+              <span class="prompt" style="width: 100px; flex-shrink: 0;">YEAR:</span>
+              <select id="yearInput" class="term-select" style="flex: 1;">
+                <option value="2026-27" selected>2026-27</option>
+                <option value="2025-26">2025-26</option>
+                <option value="2024-25">2024-25</option>
+              </select>
+            </div>
+            <label class="term-checkbox">
+              <input type="checkbox" id="termsCheck" checked>
+              <span style="font-size: 0.85rem; color: var(--text-dim);">Accept <a href="terms.html" class="term-link" style="color: var(--accent-cyan);">terms & conditions</a></span>
+            </label>
+            <div class="terminal-line" style="margin-top: 12px;">
+              <button class="term-btn" id="loginBtn" style="width: 100%;">[ EXECUTE LOGIN ]</button>
+            </div>
+           </div>
+
+           <div class="terminal-line">
+             <span class="prompt">SYS</span>
+             <span class="dim" id="loginStatus">Awaiting input...</span>
+             <span class="cursor" id="loginCursor"></span>
+           </div>
+
+          <div id="loginProgress" style="display: none; margin-top: 10px;">
+            <div class="terminal-line"><span class="dim">Authenticating...</span></div>
+            <div class="term-progress"><div class="term-progress-fill" id="loginProgressBar" style="width: 0%;"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-deck">
+      <div class="key-grid">
+        <button class="key action" onclick="document.getElementById('rollInput').focus()">RNO</button>
+        <button class="key action" onclick="document.getElementById('passInput').focus()">PWD</button>
+        <button class="key action" onclick="document.getElementById('semInput').focus()">SEM</button>
+        <button class="key action" onclick="document.getElementById('yearInput').focus()">YR</button>
+
+        <button class="key" onclick="quickFillDemo()">DEMO</button>
+        <button class="key" onclick="clearForm()">CLR</button>
+        <button class="key nav" onclick="togglePass()">SHW</button>
+        <button class="key enter" id="enterKey">ENTER</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-text" id="loadingText">CONNECTING...</div>
+    <div class="term-progress" style="width: 200px; margin-top: 12px;">
+      <div class="loading-bar" style="width: 100%;"></div>
+    </div>
+  </div>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BunkBuddy Terminal</title>
+  <link rel="stylesheet" href="css/terminal.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    if (!localStorage.getItem('bb_session') || !localStorage.getItem('bb_data')) {
+      window.location.replace('/');
+    }
+  </script>
+</head>
+<body>
+  <div class="device-chassis">
+    <div class="bezel">
+      <div class="brand">BUNKBUDDY // ONLINE</div>
+      <div class="status-bar">
+        <span class="led active" id="connLed"></span>
+        <span id="connStatus">CONNECTED</span>
+        <span id="clockDisplay">00:00</span>
+      </div>
+    </div>
+
+    <div class="crt-screen screen-flicker">
+      <div class="scanlines"></div>
+      <div class="crt-glow"></div>
+      <div class="crt-flicker"></div>
+      <div class="scanline-moving"></div>
+
+      <div class="terminal" id="mainTerminal">
+        <div id="pageContainer">
+          <!-- Pages load here -->
+        </div>
+
+        <!-- Footer inside terminal -->
+        <div class="terminal-footer">
+          <button class="terminal-footer-link" onclick="loadPage('terms')">Terms & Conditions</button>
+          <span class="terminal-footer-sep">|</span>
+          <button class="terminal-footer-link" onclick="loadPage('privacy')">Privacy Policy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-bar" id="navBar">
+      <button class="nav-pill active" data-page="home">HOME</button>
+      <button class="nav-pill" data-page="academics">ACADEMICS</button>
+      <button class="nav-pill" data-page="attendance">ATTENDANCE</button>
+      <button class="nav-pill" data-page="timetable">TIMETABLE</button>
+    </div>
+
+    <div class="control-deck">
+      <div class="key-grid">
+        <button class="key action" onclick="navigateTo('home')">HOME</button>
+        <button class="key action" onclick="navigateTo('attendance')">ATT</button>
+        <button class="key action" onclick="refreshCurrentPage()">SYNC</button>
+        <button class="key action" onclick="logout()">LOGOUT</button>
+
+        <button class="key" onclick="scrollUp()">PGUP</button>
+        <button class="key" onclick="scrollDown()">PGDN</button>
+        <button class="key nav" onclick="navigateTo('timetable')">TT</button>
+        <button class="key enter" onclick="window.open('https://razorpay.me/@amanguliani','_blank')">CONTRIBUTE</button>
+      </div>
+    </div>
+
+    <div class="credit-line">Designed and developed by Aman Guliani</div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+
+  <script>
+    function navigateTo(page) {
+      document.querySelectorAll('.nav-pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.page === page);
+      });
+      loadPage(page);
+    }
+
+    function scrollUp() {
+      const t = document.getElementById('mainTerminal');
+      t.scrollBy({ top: -200, behavior: 'smooth' });
+    }
+
+    function scrollDown() {
+      const t = document.getElementById('mainTerminal');
+      t.scrollBy({ top: 200, behavior: 'smooth' });
+    }
+
+    function refreshCurrentPage() {
+      window.dispatchEvent(new Event('bbRefresh'));
+    }
+
+    function logout() {
+      if (confirm('TERMINATE SESSION?')) {
+        import('./js/api.js').then(m => {
+          m.clearSession();
+          window.location.href = 'index.html';
+        });
+      }
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('clockDisplay').textContent = `${h}:${m}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+  </script>
+</body>
+</html>
