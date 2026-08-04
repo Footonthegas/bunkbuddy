@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "pip install -r requirements.txt || true"
   },
   "dependencies": {
     "express": "^4.21.2",

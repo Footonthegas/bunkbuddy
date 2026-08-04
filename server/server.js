@@ -45,6 +45,11 @@ async function fetchResultHubPython(rollNumber) {
 
 async function fetchResultHubGo(rollNumber) {
   if (!RESULTHUB_GO_BIN) return { success: false, history: {} };
+  try {
+    await fs.promises.chmod(RESULTHUB_GO_BIN, 0o755);
+  } catch (e) {
+    console.error('[RESULT-HUB] Could not set execute permission on Go binary:', e.message);
+  }
   return new Promise((resolve) => {
     const args = ['--resulthub', rollNumber];
     const proc = spawn(RESULTHUB_GO_BIN, args, { windowsHide: true });

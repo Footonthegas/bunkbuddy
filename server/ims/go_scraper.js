@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { chmod } from 'fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
@@ -31,6 +32,12 @@ export async function runGoScraper(rollNumber, password, year, semester) {
   const args = [rollNumber, password, '--full', '--json'];
   if (year) args.push(year);
   if (semester) args.push(semester);
+
+  try {
+    await chmod(GO_BIN, 0o755);
+  } catch (e) {
+    console.error('[GO-SCRAPER] chmod failed:', e.message);
+  }
 
   return new Promise((resolve, reject) => {
     const proc = spawn(GO_BIN, args, {
