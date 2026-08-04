@@ -80,7 +80,7 @@ async function fetchResultHubGo(rollNumber) {
   });
 }
 
-let enableExperimentalScraper = true;
+let enableExperimentalScraper = false;
 let enableGoScraper = true;
 
 const ROOT = path.join(__dirname, '..');
@@ -264,7 +264,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
   }
 
   // 3. Attempt Experimental Fast Scraper if enabled
-  if (enableExperimentalScraper) {
+  if (enableExperimentalScraper && browserPool.chromeAvailable) {
     try {
       console.log(`[LOGIN] Attempting Experimental Pooled Login+Scrape for ${rollNumber}...`);
       
@@ -308,48 +308,50 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
   // 3. Legacy Puppeteer Scraper (Fallback or Default)
   let browserToClose = null;
-  try {
-    const result = await loginToIms(rollNumber, password);
-    browserToClose = result.browser;
+  if (browserPool.chromeAvailable) {
+    try {
+      const result = await loginToIms(rollNumber, password);
+      browserToClose = result.browser;
 
-    if (!result.success) {
-      if (result.message && result.message.includes('Invalid roll number or password')) {
+      if (!result.success) {
+        if (result.message && result.message.includes('Invalid roll number or password')) {
+          loginFailed = true;
+        }
+        const status = loginFailed ? 401 : 500;
+        return res.status(status).json({ success: false, message: result.message || 'Login failed.', goError, experimentalError });
+      }
+
+      const data = await scrapeStudentData(result.page, result.browser, year, semester, rollNumber);
+      
+      const sessionId = uuidv4();
+      sessions.set(sessionId, { data, rollNumber, history: null, semester, year, password });
+
+      res.json({
+        success: true,
+        sessionId,
+        rollNumber,
+        data,
+        history: null,
+        mode: 'legacy-puppeteer',
+        experimentalError,
+        goError
+      });
+    } catch (err) {
+      console.error('Login error:', err.message);
+      if (err.message.includes('Invalid roll number or password')) {
         loginFailed = true;
       }
       const status = loginFailed ? 401 : 500;
-      return res.status(status).json({ success: false, message: result.message || 'Login failed.', goError, experimentalError });
-    }
-
-    const data = await scrapeStudentData(result.page, result.browser, year, semester, rollNumber);
-    
-    const sessionId = uuidv4();
-    sessions.set(sessionId, { data, rollNumber, history: null, semester, year, password });
-
-    res.json({
-      success: true,
-      sessionId,
-      rollNumber,
-      data,
-      history: null,
-      mode: 'legacy-puppeteer',
-      experimentalError,
-      goError
-    });
-  } catch (err) {
-    console.error('Login error:', err.message);
-    if (err.message.includes('Invalid roll number or password')) {
-      loginFailed = true;
-    }
-    const status = loginFailed ? 401 : 500;
-    res.status(status).json({
-      success: false,
-      message: loginFailed ? 'Invalid roll number or password.' : (err.message || 'Could not connect to IMS NSUT.'),
-      goError,
-      experimentalError
-    });
-  } finally {
-    if (browserToClose) {
-      await browserToClose.close().catch(() => {});
+      res.status(status).json({
+        success: false,
+        message: loginFailed ? 'Invalid roll number or password.' : (err.message || 'Could not connect to IMS NSUT.'),
+        goError,
+        experimentalError
+      });
+    } finally {
+      if (browserToClose) {
+        await browserToClose.close().catch(() => {});
+      }
     }
   }
 });
@@ -470,47 +472,49 @@ app.post('/api/data/refresh', async (req, res) => {
 
     // 3. Legacy Puppeteer Fallback
     let browserToClose = null;
-    try {
-      const legacyResult = await loginToIms(session.rollNumber, pwd);
-      browserToClose = legacyResult.browser;
+    if (browserPool.chromeAvailable) {
+      try {
+        const legacyResult = await loginToIms(session.rollNumber, pwd);
+        browserToClose = legacyResult.browser;
 
-      if (!legacyResult.success) {
-        if (legacyResult.message && legacyResult.message.includes('Invalid roll number or password')) {
+        if (!legacyResult.success) {
+          if (legacyResult.message && legacyResult.message.includes('Invalid roll number or password')) {
+            refreshLoginFailed = true;
+          }
+          const status = refreshLoginFailed ? 401 : 500;
+          return res.status(status).json({ success: false, message: refreshLoginFailed ? 'Invalid roll number or password.' : (legacyResult.message || 'Login failed.'), goRefreshError });
+        }
+
+        const data = await scrapeStudentData(legacyResult.page, legacyResult.browser, targetYear, targetSem, session.rollNumber);
+        
+        let history = null;
+        try {
+          const rh = await fetchResultHubGo(session.rollNumber);
+          if (rh && rh.success && rh.history) {
+            history = rh.history;
+          }
+        } catch(e) { }
+        
+        session.data = data;
+        session.history = history;
+        session.cookies = [];
+        session.year = targetYear;
+        session.semester = targetSem;
+        res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'legacy-puppeteer', goRefreshError });
+      } catch (err) {
+        console.error('Refresh error:', err.message);
+        if (err.message.includes('Invalid roll number or password')) {
           refreshLoginFailed = true;
         }
         const status = refreshLoginFailed ? 401 : 500;
-        return res.status(status).json({ success: false, message: refreshLoginFailed ? 'Invalid roll number or password.' : (legacyResult.message || 'Login failed.'), goRefreshError });
-      }
-
-    const data = await scrapeStudentData(legacyResult.page, legacyResult.browser, targetYear, targetSem, session.rollNumber);
-    
-    let history = null;
-    try {
-        const rh = await fetchResultHubGo(session.rollNumber);
-        if (rh && rh.success && rh.history) {
-          history = rh.history;
+        res.status(status).json({
+          success: false,
+          message: refreshLoginFailed ? 'Invalid roll number or password.' : (err.message || 'Could not connect to IMS NSUT.'),
+        });
+      } finally {
+        if (browserToClose) {
+          await browserToClose.close().catch(() => {});
         }
-    } catch(e) { }
-      
-      session.data = data;
-      session.history = history;
-      session.cookies = [];
-      session.year = targetYear;
-      session.semester = targetSem;
-      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'legacy-puppeteer', goRefreshError });
-    } catch (err) {
-      console.error('Refresh error:', err.message);
-      if (err.message.includes('Invalid roll number or password')) {
-        refreshLoginFailed = true;
-      }
-      const status = refreshLoginFailed ? 401 : 500;
-      res.status(status).json({
-        success: false,
-        message: refreshLoginFailed ? 'Invalid roll number or password.' : (err.message || 'Could not connect to IMS NSUT.'),
-      });
-    } finally {
-      if (browserToClose) {
-        await browserToClose.close().catch(() => {});
       }
     }
   } catch (err) {
