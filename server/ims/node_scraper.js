@@ -20,6 +20,9 @@ const client = axios.create({
     'User-Agent': USER_AGENT,
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
+    'sec-ch-ua': '"Chromium";v="146", "Not-A.Brand";v="24", "Google Chrome";v="146"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
   },
   validateStatus: (s) => s < 500,
 });
@@ -241,41 +244,43 @@ async function loginToIms(rollNumber, password) {
   const session = await client.get('/student_login.php');
   const html = session.data;
 
+  console.error('[LOGIN] Response status:', session.status);
+  console.error('[LOGIN] HTML length:', html.length);
+  console.error('[LOGIN] HTML preview:', html.substring(0, 500));
+
   let fy = '', comp = '', hrand = '', captchaImg = '';
 
-  const $ = cheerio.load(html);
+  const fyRe = /name\s*=\s*['"]?fy['"]?\s+id\s*=\s*['"]?fy['"]?\s+value\s*=\s*['"]([^'"]+)['"]/i;
+  const compRe = /name\s*=\s*['"]?comp['"]?\s+id\s*=\s*['"]?comp['"]?\s+type\s*=\s*['"]hidden['"]\s+readonly\s+value\s*=\s*['"]([^'"]+)['"]/i;
+  const hrandRe = /name\s*=\s*['"]?HRAND_NUM['"]?\s+id\s*=\s*['"]?HRAND_NUM['"]?\s+value\s*=\s*['"]([^'"]+)['"]/i;
+  const capsrcRe = /<img[^>]+src\s*=\s*['"]([^'"]*captcha[^'"]*)['"][^>]*id\s*=\s*['"]?captchaimg['"]?/i;
 
-  fy = $("input[name='fy']").attr('value') || $('input#fy').attr('value') || '';
-  comp = $("input[name='comp']").attr('value') || $('input#comp').attr('value') || '';
-  hrand = $("input[name='HRAND_NUM']").attr('value') || $('input#HRAND_NUM').attr('value') || '';
-  captchaImg = $("img[id='captchaimg']").attr('src') || $("img[src*='captcha']").attr('src') || '';
+  const fyMatch = html.match(fyRe);
+  const compMatch = html.match(compRe);
+  const hrandMatch = html.match(hrandRe);
+  const capsrcMatch = html.match(capsrcRe);
 
-  if (!fy || !comp || !hrand || !captchaImg) {
-    const fyRe = /name=['"]?fy['"]?\s+(?:id=['"]?fy['"]?\s+)?value=['"]([^'"]+)['"]/i;
-    const compRe = /name=['"]?comp['"]?\s+(?:id=['"]?comp['"]?\s+)?(?:type=['"]hidden['"]\s+)?(?:readonly\s+)?value=['"]([^'"]+)['"]/i;
-    const hrandRe = /name=['"]?HRAND_NUM['"]?\s+(?:id=['"]?HRAND_NUM['"]?\s+)?value=['"]([^'"]+)['"]/i;
-    const capsrcRe = /<img[^>]+src=['"]([^'"]*captcha[^'"]*)['"][^>]*id=['"]?captchaimg['"]?/i;
+  console.error('[LOGIN] Regex matches:', {
+    fy: !!fyMatch,
+    comp: !!compMatch,
+    hrand: !!hrandMatch,
+    captcha: !!capsrcMatch
+  });
 
-    const fyMatch = html.match(fyRe);
-    const compMatch = html.match(compRe);
-    const hrandMatch = html.match(hrandRe);
-    const capsrcMatch = html.match(capsrcRe);
-
-    if (!fyMatch && !compMatch && !hrandMatch) {
-      console.error('[LOGIN] HTML snippet:', html.substring(0, 2000));
-      throw new Error('Login form not found: missing fy/comp/HRAND_NUM');
-    }
-
-    fy = fyMatch ? fyMatch[1] : fy;
-    comp = compMatch ? compMatch[1] : comp;
-    hrand = hrandMatch ? hrandMatch[1] : hrand;
-    captchaImg = capsrcMatch ? capsrcMatch[1] : captchaImg;
+  if (!fyMatch && !compMatch && !hrandMatch) {
+    console.error('[LOGIN] HTML snippet (first 2000 chars):', html.substring(0, 2000));
+    throw new Error('Login form not found: missing fy/comp/HRAND_NUM');
   }
 
+  fy = fyMatch ? fyMatch[1] : fy;
+  comp = compMatch ? compMatch[1] : comp;
+  hrand = hrandMatch ? hrandMatch[1] : hrand;
+  captchaImg = capsrcMatch ? capsrcMatch[1] : captchaImg;
+
   if (!fy || !comp || !hrand || !captchaImg) {
-    console.error('[LOGIN] Missing fields after fallback:', { fy: !!fy, comp: !!comp, hrand: !!hrand, captchaImg: !!captchaImg });
+    console.error('[LOGIN] Missing fields:', { fy: !!fy, comp: !!comp, hrand: !!hrand, captchaImg: !!captchaImg });
     console.error('[LOGIN] HTML length:', html.length);
-    throw new Error('Login form not found: required fields missing after fallback');
+    throw new Error('Login form not found: required fields missing after regex');
   }
 
   const captchaUrl = captchaImg.startsWith('http') ? captchaImg : IMS_BASE + captchaImg;

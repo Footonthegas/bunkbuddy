@@ -163,6 +163,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       if (result.error && result.error.includes('Invalid roll number or password')) {
         loginFailed = true;
       }
+      console.error(`[LOGIN] ❌ Node.js scraper failed for ${rollNumber}: ${result.error}`);
       return res.status(loginFailed ? 401 : 500).json({
         success: false,
         message: loginFailed ? 'Invalid roll number or password.' : (result.error || 'Scraper failed. Please try again.'),
@@ -287,6 +288,7 @@ app.post('/api/data/refresh', async (req, res) => {
         if (result.error && result.error.includes('Invalid roll number or password')) {
           refreshLoginFailed = true;
         }
+        console.error(`[REFRESH] Node.js scraper failed for ${session.rollNumber}: ${result.error}`);
         const status = refreshLoginFailed ? 401 : 500;
         return res.status(status).json({
           success: false,
