@@ -39,12 +39,14 @@ export async function getHolidays() {
   return data.holidays || [];
 }
 
-export async function fetchAcademicHistory(sessionId) {
-  const res = await fetch(`${API_BASE}/api/academics/history`, {
+export async function fetchAcademicHistory(sessionId, signal) {
+  const opts = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId }),
-  });
+  };
+  if (signal) opts.signal = signal;
+  const res = await fetch(`${API_BASE}/api/academics/history`, opts);
   const data = await res.json();
   return { ...data, ok: res.ok };
 }

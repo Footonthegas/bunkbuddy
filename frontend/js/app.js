@@ -1,5 +1,17 @@
 import { getSession, clearSession, saveSession, refreshData, getHolidays, fetchAcademicHistory } from './api.js';
 
+const WEEKDAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+function sortWeekdays(days) {
+  return [...days].sort((a, b) => {
+    const ia = WEEKDAY_ORDER.indexOf(a);
+    const ib = WEEKDAY_ORDER.indexOf(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
 let session = null;
 let data = { home: {}, attendance: [], detailedAttendance: null, resources: [], connect: [] };
 let rollNumber = 'UNKNOWN';
@@ -407,14 +419,20 @@ async function initAcademicsPage() {
   if (!historyObj || Object.keys(historyObj).length === 0 || !historyObj.cgpa || historyObj.cgpa === '--') {
     if (session?.sessionId) {
       try {
-        const apiResult = await fetchAcademicHistory(session.sessionId);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        const apiResult = await fetchAcademicHistory(session.sessionId, controller.signal);
+        clearTimeout(timeout);
         if (apiResult.ok && apiResult.history) {
           historyObj = apiResult.history;
           if (session.data) session.data.history = historyObj;
           localStorage.setItem('bb_academic_history_v2', JSON.stringify(historyObj));
         }
       } catch (e) {
-        console.error('Failed to fetch academic history:', e);
+        console.error('Failed to fetch academic history:', e.message);
+        if (e.name === 'AbortError') {
+          if (statusEl) statusEl.innerHTML = '<span class="text-amber">Academics timeout. Press SYNC to retry.</span>';
+        }
       }
     }
   }
@@ -581,7 +599,7 @@ function initTimetablePage() {
         </div>
       `).join('');
     } else {
-      const days = Object.keys(week);
+      const days = sortWeekdays(Object.keys(week));
       if (days.length === 0) {
         container.innerHTML = '<div class="term-alert info">No weekly timetable data available.</div>';
         return;
@@ -689,11 +707,22 @@ async function refreshCurrentPage() {
 
   const statusEl = document.getElementById('refreshStatus');
   if (statusEl) {
-    statusEl.innerHTML = '<span class="warning">SYNCING DATA...</span><div class="term-progress"><div class="term-progress-fill" style="width: 60%;"></div></div>';
+    statusEl.innerHTML = '<span class="warning">SYNCING DATA...</span><div class="term-progress"><div class="term-progress-fill" style="width: 0%; transition: width 0.3s ease;"></div></div>';
   }
+
+  let progress = 0;
+  const progressInterval = setInterval(() => {
+    progress += Math.random() * 15;
+    if (progress > 90) progress = 90;
+    const fill = statusEl?.querySelector('.term-progress-fill');
+    if (fill) fill.style.width = Math.min(progress, 100) + '%';
+  }, 200);
 
   try {
     const result = await refreshData(session.sessionId, yr, sem);
+    clearInterval(progressInterval);
+    const fill = statusEl?.querySelector('.term-progress-fill');
+    if (fill) fill.style.width = '100%';
     if (result.ok && result.success) {
       saveSession(result.sessionId, result.rollNumber, result.data, result.history);
       if (result.history) localStorage.setItem('bb_academic_history_v2', JSON.stringify(result.history));
@@ -776,6 +805,7 @@ if (session?.sessionId) {
         Object.assign(session.data, result.data);
         if (result.history) session.history = result.history;
       }
+      loadPage(currentPage);
     }
   }).catch(e => console.error('Auto-sync failed:', e));
 }
