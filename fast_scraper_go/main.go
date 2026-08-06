@@ -125,6 +125,11 @@ func clearCookies() {
 }
 
 func solveCaptcha(captchaBytes []byte) string {
+	header := ""
+	if len(captchaBytes) >= 4 {
+		header = fmt.Sprintf("%02x%02x%02x%02x", captchaBytes[0], captchaBytes[1], captchaBytes[2], captchaBytes[3])
+	}
+	log.Printf("[CAPTCHA-DEBUG] image bytes=%d header=%s", len(captchaBytes), header)
 	result := solveCaptchaGo(captchaBytes)
 	log.Printf("CAPTCHA solved (Python ddddocr via subprocess): %q (len=%d)", result, len(result))
 	return result

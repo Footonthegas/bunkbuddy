@@ -55,17 +55,19 @@ def solve(raw_bytes: bytes) -> str:
     """Solve a CAPTCHA from raw image bytes and return the recognised digits."""
     try:
         variants = _build_variants(raw_bytes)
-    except Exception:
+    except Exception as e:
+        print(f"[CAPTCHA-DEBUG] variant build failed: {e}", file=sys.stderr)
         return ""
 
     predictions: list[str] = []
-    for vb in variants:
+    for i, vb in enumerate(variants):
         try:
             raw = _ocr.classification(vb)
             digits = re.sub(r"\D", "", raw or "")
             if digits:
                 predictions.append(digits)
-        except Exception:
+        except Exception as e:
+            print(f"[CAPTCHA-DEBUG] variant {i} failed: {e}", file=sys.stderr)
             continue
 
     if not predictions:
