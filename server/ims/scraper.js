@@ -551,12 +551,12 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
                     }
                 }
             }
-            if (history.sgpa.length === 0) {
-                const numbers = renderedText.match(/\b\d+\.\d+\b/g);
-                if (numbers) {
-                    const unique = [...new Set(numbers.map(Number))];
-                    history.sgpa = unique.filter(n => n > 0 && n <= 10).slice(0, 8);
-                }
+        }
+        if (history.sgpa.length === 0) {
+            const numbers = seed.match(/\b\d+\.\d+\b/g);
+            if (numbers) {
+                const unique = [...new Set(numbers.map(Number))];
+                history.sgpa = unique.filter(n => n > 0 && n <= 10).slice(0, 8);
             }
         }
         

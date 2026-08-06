@@ -176,10 +176,10 @@ export function normalizeGoResult(goJson, semester = '1') {
   }));
 
   const mappedWeekTimetable = {};
-  const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   for (const [day, slots] of Object.entries(weekTimetable)) {
     const normDay = normalizeDay(day);
-    if (!normDay) continue;
+    if (!normDay || normDay === 'Sat' || normDay === 'Sun') continue;
     mappedWeekTimetable[normDay] = slots.map(slot => ({
       time: slot.time,
       subject: mapSubject(slot.subject),
@@ -188,6 +188,7 @@ export function normalizeGoResult(goJson, semester = '1') {
   for (const d of dayOrder) {
     if (!mappedWeekTimetable[d]) mappedWeekTimetable[d] = [];
   }
+
 
 
   return {
@@ -334,7 +335,7 @@ export function normalizeNodeResult(nodeJson) {
   }));
 
   const mappedWeek = {};
-  const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   const dayMap = {
     'monday': 'Mon', 'mon': 'Mon', 'm': 'Mon',
     'tuesday': 'Tue', 'tue': 'Tue', 'tues': 'Tue', 'tu': 'Tue',
@@ -350,7 +351,7 @@ export function normalizeNodeResult(nodeJson) {
   }
   for (const [day, slots] of Object.entries(data.timetable_week || {})) {
     const normDay = normalizeDay(day);
-    if (!normDay) continue;
+    if (!normDay || normDay === 'Sat' || normDay === 'Sun') continue;
     mappedWeek[normDay] = slots.map(slot => ({
       time: slot.time,
       subject: mapSubject(slot.subject),

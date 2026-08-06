@@ -1,8 +1,7 @@
 """
-solve_captcha_cli.py - CAPTCHA solver using ddddocr with old model for numeric CAPTCHAs.
-
-Reads raw image bytes from stdin, solves using ddddocr old model with
-multiple preprocessing variants, writes best candidate to stdout.
+solve_captcha_cli.py - CAPTCHA solver using ddddocr.
+Reads raw image bytes from stdin, solves using ddddocr default model.
+Writes best candidate to stdout.
 
 Usage:
     python solve_captcha_cli.py < image_bytes
@@ -14,21 +13,18 @@ import sys
 from collections import Counter
 
 import ddddocr
-from PIL import Image, ImageOps, ImageFilter, ImageEnhance
+from PIL import Image, ImageOps
 
 EXPECTED_CAPTCHA_LEN = 5
+DEBUG = False
+
+def _dbg(msg):
+    if DEBUG:
+        print(msg, file=sys.stderr, flush=True)
 
 try:
-    _ocr = ddddocr.DdddOcr(show_ad=False, old_model=True)
-    print(f"[CAPTCHA-PY-DEBUG] ddddocr old_model loaded", file=sys.stderr, flush=True)
-except TypeError:
-    print(f"[CAPTCHA-PY-DEBUG] old_model not supported, using default model", file=sys.stderr, flush=True)
-    try:
-        _ocr = ddddocr.DdddOcr(show_ad=False)
-        print(f"[CAPTCHA-PY-DEBUG] ddddocr default model loaded", file=sys.stderr, flush=True)
-    except Exception as e2:
-        print(f"[CAPTCHA-PY-DEBUG] ddddocr init failed: {e2}", file=sys.stderr, flush=True)
-        _ocr = None
+    _ocr = ddddocr.DdddOcr(show_ad=False)
+    _dbg("[CAPTCHA-PY-DEBUG] ddddocr loaded")
 except Exception as e:
     print(f"[CAPTCHA-PY-DEBUG] ddddocr init failed: {e}", file=sys.stderr, flush=True)
     _ocr = None
@@ -37,32 +33,24 @@ except Exception as e:
 def _build_variants(raw_bytes):
     try:
         base = Image.open(io.BytesIO(raw_bytes))
-        print(f"[CAPTCHA-PY-DEBUG] image format={base.format} size={base.size} mode={base.mode}", file=sys.stderr, flush=True)
+        _dbg(f"[CAPTCHA-PY-DEBUG] image format={base.format} size={base.size} mode={base.mode}")
         base = base.convert("L")
         base = ImageOps.autocontrast(base)
     except Exception as e:
         print(f"[CAPTCHA-PY-DEBUG] image load failed: {e}", file=sys.stderr, flush=True)
         return []
 
-    variants = [base]
-    denoised = base.filter(ImageFilter.MedianFilter(size=3))
-    variants.append(denoised)
-
-    bw = denoised.point(lambda p: 255 if p > 128 else 0).convert("L")
-    variants.append(bw)
-
     out = []
     seen = set()
-    for img in variants:
-        scaled = img.resize((img.width * 3, img.height * 3), Image.Resampling.NEAREST)
+    for img in [base]:
         buf = io.BytesIO()
-        scaled.save(buf, format="PNG")
+        img.save(buf, format="PNG")
         b = buf.getvalue()
         if b not in seen and len(b) > 10:
             out.append(b)
             seen.add(b)
 
-    print(f"[CAPTCHA-PY-DEBUG] built {len(out)} variants", file=sys.stderr, flush=True)
+    _dbg(f"[CAPTCHA-PY-DEBUG] built {len(out)} variants")
     return out
 
 
@@ -74,39 +62,17 @@ def solve(raw_bytes):
     if not variants:
         return ""
 
-    predictions = []
-    for i, vb in enumerate(variants):
-        if _ocr is None:
-            break
-        try:
-            raw = _ocr.classification(vb)
-            digits = re.sub(r"\D", "", raw or "")
-            print(f"[CAPTCHA-PY-DEBUG] variant {i}: raw={raw!r} digits={digits!r}", file=sys.stderr, flush=True)
-            if digits:
-                predictions.append(digits)
-                if len(digits) == EXPECTED_CAPTCHA_LEN:
-                    print(f"[CAPTCHA-PY-DEBUG] early exit on variant {i}", file=sys.stderr, flush=True)
-                    return digits
-        except Exception as e:
-            print(f"[CAPTCHA-PY-DEBUG] variant {i} failed: {e}", file=sys.stderr, flush=True)
-            continue
+    raw = _ocr.classification(variants[0])
+    digits = re.sub(r"\D", "", raw or "")
+    _dbg(f"[CAPTCHA-PY-DEBUG] raw={raw!r} digits={digits!r}")
+    if len(digits) == EXPECTED_CAPTCHA_LEN:
+        return digits
 
-    if not predictions:
-        return ""
-
-    exact_len = [p for p in predictions if len(p) == EXPECTED_CAPTCHA_LEN]
-    if exact_len:
-        result = Counter(exact_len).most_common(1)[0][0]
-        print(f"[CAPTCHA-PY-DEBUG] selected (exact): {result}", file=sys.stderr, flush=True)
-        return result
-
-    near_len = [p for p in predictions if len(p) >= 4]
+    near_len = [p for p in [digits] if len(p) >= 4 and p]
     if near_len:
-        result = Counter(near_len).most_common(1)[0][0]
-        print(f"[CAPTCHA-PY-DEBUG] selected (near): {result}", file=sys.stderr, flush=True)
-        return result
+        return digits
 
-    return ""
+    return digits
 
 
 if __name__ == "__main__":

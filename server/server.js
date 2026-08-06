@@ -174,6 +174,12 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
         if (rh.history?.cgpa) {
           normalized.home.profile.cgpa = rh.history.cgpa;
         }
+        if (rh.history?.name && normalized.home.profile.name === 'Student') {
+          normalized.home.profile.name = rh.history.name;
+        }
+        if (rh.history?.major) {
+          normalized.home.profile.program = rh.history.major;
+        }
       }
     } catch (e) {
       console.error('[LOGIN] ResultHub fetch failed:', e.message);
@@ -222,9 +228,15 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
             const rh = await fetchResultHubNode(rollNumber);
             if (rh && rh.success) {
               history = rh.history;
-              if (rh.history?.cgpa) {
-                normalizedNode.home.profile.cgpa = rh.history.cgpa;
-              }
+                if (rh.history?.cgpa) {
+                  normalizedNode.home.profile.cgpa = rh.history.cgpa;
+                }
+                if (rh.history?.name && normalizedNode.home.profile.name === 'Student') {
+                  normalizedNode.home.profile.name = rh.history.name;
+                }
+                if (rh.history?.major) {
+                  normalizedNode.home.profile.program = rh.history.major;
+                }
             }
           } catch (e) {
             console.error('[LOGIN] ResultHub fetch failed:', e.message);
@@ -337,10 +349,16 @@ app.post('/api/data/refresh', async (req, res) => {
       if (!session.history || Object.keys(session.history).length === 0) {
         try {
           const rh = await fetchResultHubNode(session.rollNumber);
-          if (rh && rh.success) {
+            if (rh && rh.success) {
             session.history = rh.history;
             if (rh.history?.cgpa) {
               normalized.home.profile.cgpa = rh.history.cgpa;
+            }
+            if (rh.history?.name && normalized.home.profile.name === 'Student') {
+              normalized.home.profile.name = rh.history.name;
+            }
+            if (rh.history?.major) {
+              normalized.home.profile.program = rh.history.major;
             }
           }
         } catch (e) {
