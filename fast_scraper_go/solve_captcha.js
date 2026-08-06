@@ -41,6 +41,8 @@ async function main() {
     process.exit(1);
   }
 
+  process.stderr.write(`[CAPTCHA-DEBUG] image bytes=${rawBytes.length} header=${rawBytes.slice(0,4).toString('hex')}\n`);
+
   const worker = createWorker({ logger: m => {} });
 
   try {
@@ -48,11 +50,12 @@ async function main() {
     await worker.loadLanguage('eng');
     await worker.initialize('eng');
 
-    const psmModes = ['8', '13', '7', '6', '10'];
+    const psmModes = ['8', '13', '7', '6'];
     const predictions = [];
 
     for (const psm of psmModes) {
       const text = await ocrBuffer(worker, rawBytes, psm);
+      process.stderr.write(`[CAPTCHA-DEBUG] PSM ${psm} raw="${text}" len=${text.length}\n`);
       if (text && text.length >= 4) {
         predictions.push(text);
       }
@@ -60,8 +63,10 @@ async function main() {
 
     await worker.terminate();
 
+    process.stderr.write(`[CAPTCHA-DEBUG] all predictions: ${JSON.stringify(predictions)}\n`);
+
     if (predictions.length === 0) {
-      process.stderr.write('[CAPTCHA-DEBUG] tesseract.js returned no valid predictions\n');
+      process.stderr.write('[CAPTCHA-DEBUG] no valid predictions\n');
       process.exit(1);
     }
 
@@ -70,6 +75,7 @@ async function main() {
       const counts = {};
       exact.forEach(p => counts[p] = (counts[p] || 0) + 1);
       const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      process.stderr.write(`[CAPTCHA-DEBUG] selected (exact): "${best}"\n`);
       console.log(best);
       process.exit(0);
     }
@@ -79,6 +85,7 @@ async function main() {
       const counts = {};
       near.forEach(p => counts[p] = (counts[p] || 0) + 1);
       const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+      process.stderr.write(`[CAPTCHA-DEBUG] selected (near): "${best}"\n`);
       console.log(best);
       process.exit(0);
     }
