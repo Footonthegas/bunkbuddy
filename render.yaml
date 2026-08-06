@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: bunkbuddy
+    runtime: node
+    rootDir: .
+    build:
+      command: npm install && chmod +x fast_scraper_go/fast_scraper_go && python3 -m pip install --no-cache-dir --break-system-packages -r server/requirements.txt
+    startCommand: node server/server.js
+    healthCheck:
+      path: /api/health
+      interval: 30
