@@ -16,11 +16,14 @@ import { scrapeWithNode } from './ims/node_scraper.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function fetchResultHubNode(rollNumber) {
+  console.log(`[RESULT-HUB] Scraping ${rollNumber} from https://www.resulthubdtu.com/...`);
   try {
     const profile = await fetchStudentDetailedProfile(rollNumber);
     if (profile && profile.success && profile.history) {
+      console.log(`[RESULT-HUB] Success for ${rollNumber}:`, JSON.stringify(profile.history));
       return { success: true, history: profile.history };
     }
+    console.log(`[RESULT-HUB] Profile fetch returned success=false for ${rollNumber}`);
   } catch (e) {
     console.error('[RESULT-HUB] Node.js fetch failed:', e.message);
   }
@@ -166,39 +169,11 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
     const sessionId = uuidv4();
     
-    let history = null;
-    try {
-      const rh = await fetchResultHubNode(rollNumber);
-      if (rh && rh.success) {
-        history = rh.history;
-        if (rh.history?.cgpa) {
-          normalized.home.profile.cgpa = rh.history.cgpa;
-        }
-        if (rh.history?.name && normalized.home.profile.name === 'Student') {
-          normalized.home.profile.name = rh.history.name;
-        }
-        if (rh.history?.major) {
-          normalized.home.profile.program = rh.history.major;
-        }
-        normalized.home.academicHistory = {
-          cgpa: rh.history.cgpa || '--',
-          universityRank: rh.history.universityRank || '--',
-          deptRank: rh.history.deptRank || '--',
-          credits: rh.history.credits || '--',
-          sgpa: rh.history.sgpa || [],
-          college: rh.history.college || 'NSUT',
-          year: rh.history.year || '',
-        };
-      }
-    } catch (e) {
-      console.error('[LOGIN] ResultHub fetch failed:', e.message);
-    }
-    
     const sessionPayload = {
       sessionId,
       rollNumber,
       data: normalized,
-      history,
+      history: null,
       cookies: [],
       cookieJar: null,
       password: password,
@@ -209,13 +184,17 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
     sessions.set(sessionId, sessionPayload);
     sessionCache.setSession(rollNumber, sessionPayload, semester, year);
 
-    console.log(`[LOGIN] ✅ Go scraper completed for ${rollNumber} (${normalized.attendance.length} subjects)!`);
+    console.log(`[LOGIN] Go scraper completed in ${goJson.elapsed_ms || '?'}ms for ${rollNumber} (${normalized.attendance.length} subjects)!`);
     return res.json({
       success: true,
       sessionId,
       rollNumber,
       data: normalized,
-      history,
+      history: null,
+      timings: {
+        total_ms: goJson.elapsed_ms || null,
+        phases: goJson._timings || [],
+      },
       mode: 'go-scraper'
     });
   } catch (err) {
@@ -232,39 +211,11 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
           const normalizedNode = normalizeNodeResult(nodeResult);
           const sessionId = uuidv4();
 
-          let history = null;
-          try {
-            const rh = await fetchResultHubNode(rollNumber);
-            if (rh && rh.success) {
-              history = rh.history;
-                if (rh.history?.cgpa) {
-                  normalizedNode.home.profile.cgpa = rh.history.cgpa;
-                }
-                if (rh.history?.name && normalizedNode.home.profile.name === 'Student') {
-                  normalizedNode.home.profile.name = rh.history.name;
-                }
-                if (rh.history?.major) {
-                  normalizedNode.home.profile.program = rh.history.major;
-                }
-                normalizedNode.home.academicHistory = {
-                  cgpa: rh.history.cgpa || '--',
-                  universityRank: rh.history.universityRank || '--',
-                  deptRank: rh.history.deptRank || '--',
-                  credits: rh.history.credits || '--',
-                  sgpa: rh.history.sgpa || [],
-                  college: rh.history.college || 'NSUT',
-                  year: rh.history.year || '',
-                };
-              }
-            } catch (e) {
-            console.error('[LOGIN] ResultHub fetch failed:', e.message);
-          }
-
           const sessionPayload = {
             sessionId,
             rollNumber,
             data: normalizedNode,
-            history,
+            history: null,
             cookies: [],
             cookieJar: null,
             password: password,
@@ -275,13 +226,13 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
           sessions.set(sessionId, sessionPayload);
           sessionCache.setSession(rollNumber, sessionPayload, semester, year);
 
-          console.log(`[LOGIN] ✅ Node.js scraper completed for ${rollNumber} (${normalizedNode.attendance.length} subjects)!`);
+          console.log(`[LOGIN] Node.js scraper completed for ${rollNumber} (${normalizedNode.attendance.length} subjects)!`);
           return res.json({
             success: true,
             sessionId,
             rollNumber,
             data: normalizedNode,
-            history,
+            history: null,
             mode: 'node-scraper'
           });
         }
@@ -331,6 +282,32 @@ app.post('/api/academics/history', async (req, res) => {
   res.json({ success: false, message: 'Failed to fetch academic history.' });
 });
 
+app.get('/api/academic-history/:rollNumber', async (req, res) => {
+  const { rollNumber } = req.params;
+  if (!rollNumber) {
+    return res.status(400).json({ success: false, message: 'Roll number is required.' });
+  }
+
+  const session = req.query.sessionId ? sessions.get(req.query.sessionId) : null;
+  if (session && session.history && Object.keys(session.history).length > 0) {
+    return res.json({ success: true, history: session.history, cached: true });
+  }
+
+  try {
+    const rh = await fetchResultHubNode(rollNumber);
+    if (rh && rh.success && rh.history) {
+      if (session) {
+        session.history = rh.history;
+      }
+      return res.json({ success: true, history: rh.history, cached: false });
+    }
+  } catch (e) {
+    console.error("ResultHub fetch failed:", e.message);
+  }
+
+  res.json({ success: false, message: 'Failed to fetch academic history.' });
+});
+
 app.get('/api/data', async (req, res) => {
   const session = sessions.get(req.query.sessionId);
   if (!session) {
@@ -364,39 +341,11 @@ app.post('/api/data/refresh', async (req, res) => {
       const goJson = await runGoScraper(session.rollNumber, pwd, targetYear, targetSem);
       const normalized = normalizeGoResult(goJson);
 
-      if (!session.history || Object.keys(session.history).length === 0) {
-        try {
-          const rh = await fetchResultHubNode(session.rollNumber);
-            if (rh && rh.success) {
-            session.history = rh.history;
-            if (rh.history?.cgpa) {
-              normalized.home.profile.cgpa = rh.history.cgpa;
-            }
-            if (rh.history?.name && normalized.home.profile.name === 'Student') {
-              normalized.home.profile.name = rh.history.name;
-            }
-            if (rh.history?.major) {
-              normalized.home.profile.program = rh.history.major;
-            }
-            normalized.home.academicHistory = {
-              cgpa: rh.history.cgpa || '--',
-              universityRank: rh.history.universityRank || '--',
-              deptRank: rh.history.deptRank || '--',
-              credits: rh.history.credits || '--',
-              sgpa: rh.history.sgpa || [],
-              college: rh.history.college || 'NSUT',
-              year: rh.history.year || '',
-            };
-          }
-        } catch (e) {
-          console.error('[REFRESH] ResultHub fetch failed:', e.message);
-        }
-      }
-
       session.data = normalized;
       session.year = targetYear;
       session.semester = targetSem;
-      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'go-refresh' });
+      console.log(`[REFRESH] ✅ Go scraper refreshed ${session.rollNumber} (${normalized.attendance.length} subjects)!`);
+      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, timings: { total_ms: goJson.elapsed_ms || null, phases: goJson._timings || [] }, mode: 'go-refresh' });
       return;
     } catch (goErr) {
       if (goErr.message && goErr.message.includes('Invalid roll number or password')) {
@@ -411,38 +360,10 @@ app.post('/api/data/refresh', async (req, res) => {
           if (nodeResult && nodeResult.status === 'success') {
             const normalizedNode = normalizeNodeResult(nodeResult);
 
-               if (!session.history || Object.keys(session.history).length === 0) {
-               try {
-                 const rh = await fetchResultHubNode(session.rollNumber);
-                 if (rh && rh.success) {
-                   session.history = rh.history;
-                   if (rh.history?.cgpa) {
-                     normalizedNode.home.profile.cgpa = rh.history.cgpa;
-                   }
-                   if (rh.history?.name && normalizedNode.home.profile.name === 'Student') {
-                     normalizedNode.home.profile.name = rh.history.name;
-                   }
-                   if (rh.history?.major) {
-                     normalizedNode.home.profile.program = rh.history.major;
-                   }
-                   normalizedNode.home.academicHistory = {
-                     cgpa: rh.history.cgpa || '--',
-                     universityRank: rh.history.universityRank || '--',
-                     deptRank: rh.history.deptRank || '--',
-                     credits: rh.history.credits || '--',
-                     sgpa: rh.history.sgpa || [],
-                     college: rh.history.college || 'NSUT',
-                     year: rh.history.year || '',
-                   };
-                 }
-               } catch (e) {
-                console.error('[REFRESH] ResultHub fetch failed:', e.message);
-              }
-            }
-
             session.data = normalizedNode;
             session.year = targetYear;
             session.semester = targetSem;
+            console.log(`[REFRESH] ✅ Node.js scraper refreshed ${session.rollNumber} (${normalizedNode.attendance.length} subjects)!`);
             return res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'node-refresh' });
           }
         } catch (nodeErr) {

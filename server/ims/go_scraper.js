@@ -60,6 +60,18 @@ export async function runGoScraper(rollNumber, password, year, semester) {
     });
 
     proc.on('close', (code) => {
+      const phases = [];
+      const phaseRe = /\[PHASE\]\s*(.+?):\s*(\d+)ms/;
+      for (const line of stderr.split('\n')) {
+        const m = line.match(phaseRe);
+        if (m) {
+          phases.push({ phase: m[1].trim(), ms: parseInt(m[2], 10) });
+        }
+      }
+      if (phases.length > 0) {
+        console.log(`[GO-SCRAPER] Timings: ${phases.map(p => `${p.phase} (${p.ms}ms)`).join(', ')}`);
+      }
+
       if (stderr.trim()) {
         console.error(`[GO-SCRAPER] stderr: ${stderr.trim()}`);
       }
@@ -79,6 +91,9 @@ export async function runGoScraper(rollNumber, password, year, semester) {
 
       try {
         const json = JSON.parse(trimmed);
+        if (phases.length > 0) {
+          json._timings = phases;
+        }
         resolve(json);
       } catch (e) {
         reject(new Error(`Go scraper returned invalid JSON: ${e.message}`));
@@ -206,6 +221,8 @@ export function normalizeGoResult(goJson, semester = '1') {
     weekTimetable: mappedWeekTimetable,
     subjectNames: subjectNames,
     courses: courses,
+    _timings: goJson._timings || [],
+    _elapsed_ms: goJson.elapsed_ms || null,
   };
 }
 
@@ -381,5 +398,7 @@ export function normalizeNodeResult(nodeJson) {
     weekTimetable: mappedWeek,
     subjectNames,
     courses: data.courses || [],
+    _timings: nodeJson?._timings || [],
+    _elapsed_ms: nodeJson?.elapsed_ms || nodeJson?.elapsedMs || null,
   };
 }

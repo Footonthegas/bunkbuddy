@@ -481,9 +481,9 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
                 headers: { 
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5'
+                    'Accept-Language': 'en-US,en;q=0.5',
                 },
-                signal: AbortSignal.timeout(10000)
+                signal: AbortSignal.timeout(15000)
             });
 
             if (!res.ok) {
@@ -511,7 +511,7 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
         if (cgpaMatch) history.cgpa = cgpaMatch[1];
         else history.cgpa = '--';
         
-        let uniRankMatch = seed.match(/University Rank[\s\n]*#?(\d+)/i) || seed.match(/University[\s\n]+Rank[:\s]*#?(\d+)/i);
+        let uniRankMatch = seed.match(/University Rank[:.\s]*#?(\d+)/i) || seed.match(/University[\s\n]+Rank[:.\s]*#?(\d+)/i);
         if (uniRankMatch) history.universityRank = '#' + uniRankMatch[1];
         else history.universityRank = '--';
         
