@@ -499,6 +499,8 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
         const metaDesc = $('meta[name="description"], meta[property="og:description"], meta[name="twitter:description"]').attr('content') || '';
         const ldJsonScript = $('script[type="application/ld+json"]').html() || '';
         const bodyText = $.text();
+
+        console.log(`[RESULT-HUB] Scraping profile for ${rollNumber} (year=${year})`);
         
         // Use rendered text if available (from Puppeteer), otherwise fall back to body text
         const seed = renderedText 
@@ -566,15 +568,22 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
         }
 
         history.name = 'Student';
+        history.college = 'NSUT';
+        history.year = year.toString();
         try {
             const ldData = JSON.parse(ldJsonScript);
             if (ldData && ldData.name) {
                 history.name = ldData.name;
             }
+            if (ldData && ldData.affiliation && ldData.affiliation.name) {
+                history.college = ldData.affiliation.name;
+            }
         } catch(e) {
             const nameMatch = seed.match(/<title>([^<]+?)\(/);
             if (nameMatch) history.name = nameMatch[1].trim();
         }
+
+        console.log(`[RESULT-HUB] Profile: name=${history.name}, cgpa=${history.cgpa}, rank=${history.universityRank}, major=${history.major}`);
 
         profile.success = true;
         profile.history = history;

@@ -180,6 +180,15 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
         if (rh.history?.major) {
           normalized.home.profile.program = rh.history.major;
         }
+        normalized.home.academicHistory = {
+          cgpa: rh.history.cgpa || '--',
+          universityRank: rh.history.universityRank || '--',
+          deptRank: rh.history.deptRank || '--',
+          credits: rh.history.credits || '--',
+          sgpa: rh.history.sgpa || [],
+          college: rh.history.college || 'NSUT',
+          year: rh.history.year || '',
+        };
       }
     } catch (e) {
       console.error('[LOGIN] ResultHub fetch failed:', e.message);
@@ -237,8 +246,17 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
                 if (rh.history?.major) {
                   normalizedNode.home.profile.program = rh.history.major;
                 }
-            }
-          } catch (e) {
+                normalizedNode.home.academicHistory = {
+                  cgpa: rh.history.cgpa || '--',
+                  universityRank: rh.history.universityRank || '--',
+                  deptRank: rh.history.deptRank || '--',
+                  credits: rh.history.credits || '--',
+                  sgpa: rh.history.sgpa || [],
+                  college: rh.history.college || 'NSUT',
+                  year: rh.history.year || '',
+                };
+              }
+            } catch (e) {
             console.error('[LOGIN] ResultHub fetch failed:', e.message);
           }
 
@@ -360,6 +378,15 @@ app.post('/api/data/refresh', async (req, res) => {
             if (rh.history?.major) {
               normalized.home.profile.program = rh.history.major;
             }
+            normalized.home.academicHistory = {
+              cgpa: rh.history.cgpa || '--',
+              universityRank: rh.history.universityRank || '--',
+              deptRank: rh.history.deptRank || '--',
+              credits: rh.history.credits || '--',
+              sgpa: rh.history.sgpa || [],
+              college: rh.history.college || 'NSUT',
+              year: rh.history.year || '',
+            };
           }
         } catch (e) {
           console.error('[REFRESH] ResultHub fetch failed:', e.message);
@@ -384,16 +411,31 @@ app.post('/api/data/refresh', async (req, res) => {
           if (nodeResult && nodeResult.status === 'success') {
             const normalizedNode = normalizeNodeResult(nodeResult);
 
-            if (!session.history || Object.keys(session.history).length === 0) {
-              try {
-                const rh = await fetchResultHubNode(session.rollNumber);
-                if (rh && rh.success) {
-                  session.history = rh.history;
-                  if (rh.history?.cgpa) {
-                    normalizedNode.home.profile.cgpa = rh.history.cgpa;
-                  }
-                }
-              } catch (e) {
+               if (!session.history || Object.keys(session.history).length === 0) {
+               try {
+                 const rh = await fetchResultHubNode(session.rollNumber);
+                 if (rh && rh.success) {
+                   session.history = rh.history;
+                   if (rh.history?.cgpa) {
+                     normalizedNode.home.profile.cgpa = rh.history.cgpa;
+                   }
+                   if (rh.history?.name && normalizedNode.home.profile.name === 'Student') {
+                     normalizedNode.home.profile.name = rh.history.name;
+                   }
+                   if (rh.history?.major) {
+                     normalizedNode.home.profile.program = rh.history.major;
+                   }
+                   normalizedNode.home.academicHistory = {
+                     cgpa: rh.history.cgpa || '--',
+                     universityRank: rh.history.universityRank || '--',
+                     deptRank: rh.history.deptRank || '--',
+                     credits: rh.history.credits || '--',
+                     sgpa: rh.history.sgpa || [],
+                     college: rh.history.college || 'NSUT',
+                     year: rh.history.year || '',
+                   };
+                 }
+               } catch (e) {
                 console.error('[REFRESH] ResultHub fetch failed:', e.message);
               }
             }
