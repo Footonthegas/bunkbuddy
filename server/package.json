@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "postinstall": "python3 -m pip install --no-cache-dir -r requirements.txt 2>&1 || python -m pip install --no-cache-dir -r requirements.txt 2>&1 || true"
+    "postinstall": "python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt 2>&1 || python -m pip install --no-cache-dir --break-system-packages -r requirements.txt 2>&1 || true"
   },
   "dependencies": {
     "express": "^4.21.2",
