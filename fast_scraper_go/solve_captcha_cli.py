@@ -1,74 +1,109 @@
 """
-solve_captcha_cli.py – Standalone CLI entry point for CAPTCHA solving.
+solve_captcha_cli.py - CAPTCHA solver using pytesseract with aggressive preprocessing.
 
-Reads raw image bytes from stdin, solves using ddddocr with multiple
+Reads raw image bytes from stdin, solves using tesseract OCR with multiple
 preprocessing variants, and writes the best candidate text to stdout.
+
+Falls back to ddddocr if pytesseract fails.
 
 Usage:
     python solve_captcha_cli.py < image_bytes
     cat captcha.png | python solve_captcha_cli.py
 """
-
 import io
 import re
 import sys
+import os
+import subprocess
 from collections import Counter
 
-import ddddocr
+import numpy as np
 from PIL import Image, ImageOps, ImageFilter
+import pytesseract
 
 EXPECTED_CAPTCHA_LEN = 5
 
-_ocr = ddddocr.DdddOcr(show_ad=False)
+_custom_config = r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789'
 
 
-def _build_variants(raw_bytes: bytes) -> list[bytes]:
-    """Generate multiple preprocessed image variants to improve OCR reliability."""
-    base = Image.open(io.BytesIO(raw_bytes)).convert("L")
+def _try_tesseract(img: Image.Image) -> str:
+    try:
+        text = pytesseract.image_to_string(img, config=_custom_config)
+        digits = re.sub(r"\D", "", text or "")
+        return digits
+    except Exception:
+        return ""
+
+
+def _try_ddddocr(img: Image.Image) -> str:
+    try:
+        import ddddocr
+        if not hasattr(_try_ddddocr, '_ocr'):
+            _try_ddddocr._ocr = ddddocr.DdddOcr(show_ad=False)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        raw = _try_ddddocr._ocr.classification(buf.getvalue())
+        digits = re.sub(r"\D", "", raw or "")
+        return digits
+    except Exception:
+        return ""
+
+
+def _preprocess_variants(raw_bytes: bytes) -> list:
+    try:
+        base = Image.open(io.BytesIO(raw_bytes)).convert("L")
+    except Exception:
+        return []
+
+    variants = []
+
     base = ImageOps.autocontrast(base)
-
-    variants: list[Image.Image] = [base]
+    variants.append(base)
 
     denoised = base.filter(ImageFilter.MedianFilter(size=3))
     variants.append(denoised)
 
-    for threshold in (90, 110, 130, 150, 170):
+    for threshold in (80, 100, 120, 140, 160, 180):
         bw = denoised.point(lambda p, t=threshold: 255 if p > t else 0).convert("L")
         variants.append(bw)
         variants.append(ImageOps.invert(bw))
 
-    out: list[bytes] = []
-    seen: set[bytes] = set()
+    out = []
+    seen = set()
     for img in variants:
-        scaled = img.resize((img.width * 2, img.height * 2), Image.Resampling.NEAREST)
-        buf = io.BytesIO()
-        scaled.save(buf, format="PNG")
-        b = buf.getvalue()
-        if b not in seen:
-            out.append(b)
-            seen.add(b)
+        scaled = img.resize((img.width * 3, img.height * 3), Image.Resampling.NEAREST)
+        if scaled.mode != 'L':
+            scaled = scaled.convert('L')
+        out.append(scaled)
 
     return out
 
 
 def solve(raw_bytes: bytes) -> str:
-    """Solve a CAPTCHA from raw image bytes and return the recognised digits."""
-    try:
-        variants = _build_variants(raw_bytes)
-    except Exception as e:
-        print(f"[CAPTCHA-DEBUG] variant build failed: {e}", file=sys.stderr)
+    if not raw_bytes:
         return ""
 
-    predictions: list[str] = []
-    for i, vb in enumerate(variants):
+    variants = _preprocess_variants(raw_bytes)
+    if not variants:
+        return ""
+
+    predictions = []
+
+    for i, img in enumerate(variants):
+        text = ""
         try:
-            raw = _ocr.classification(vb)
-            digits = re.sub(r"\D", "", raw or "")
-            if digits:
-                predictions.append(digits)
-        except Exception as e:
-            print(f"[CAPTCHA-DEBUG] variant {i} failed: {e}", file=sys.stderr)
-            continue
+            text = _try_tesseract(img)
+        except Exception:
+            pass
+
+        if not text:
+            try:
+                text = _try_ddddocr(img)
+            except Exception:
+                pass
+
+        if text:
+            predictions.append(text)
 
     if not predictions:
         return ""
@@ -81,7 +116,8 @@ def solve(raw_bytes: bytes) -> str:
     if near_len:
         return Counter(near_len).most_common(1)[0][0]
 
-    return ""
+    best = max(predictions, key=len)
+    return best
 
 
 if __name__ == "__main__":
