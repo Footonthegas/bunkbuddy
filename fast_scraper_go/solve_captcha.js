@@ -1,91 +1,32 @@
 /**
- * solve_captcha_cli.js - CAPTCHA solver using tesseract.js with aggressive preprocessing.
+ * solve_captcha.js - CAPTCHA solver using tesseract.js.
  *
- * Reads raw image bytes from stdin, solves using tesseract.js with multiple
- * preprocessing variants, and writes the best candidate text to stdout.
+ * Reads raw image bytes from stdin (JPEG/PNG), solves using tesseract.js
+ * with multiple PSM modes and a numeric whitelist, writes best candidate
+ * to stdout.
+ *
+ * No native modules beyond tesseract.js itself. No ImageMagick or canvas.
  *
  * Usage:
- *     node solve_captcha_cli.js < image_bytes
- *     cat captcha.png | node solve_captcha_cli.js
+ *     node solve_captcha.js < image_bytes
  */
 
 import { createWorker } from 'tesseract.js';
-import { Readable } from 'stream';
-import { promisify } from 'util';
-import { exec } from 'child_process';
 
-const sleep = promisify(setTimeout);
-
-async function preprocessImage(rawBytes) {
-  const { execSync } = await import('child_process');
-  const fs = await import('fs');
-
-  const tmpInput = '/tmp/captcha_input.png';
-  const tmpOutput = '/tmp/captcha_out_%d.png';
-
-  fs.writeFileSync(tmpInput, rawBytes);
-
-  const variants = [];
-
-  const baseCmd = `convert ${tmpInput} -colorspace Gray -auto-level`;
-  const cmds = [
-    `${baseCmd} ${tmpOutput.replace('%d', '0')}`,
-    `${baseCmd} -median 3 ${tmpOutput.replace('%d', '1')}`,
-    `${baseCmd} -median 3 -threshold 80% ${tmpOutput.replace('%d', '2')}`,
-    `${baseCmd} -median 3 -threshold 90% ${tmpOutput.replace('%d', '3')}`,
-    `${baseCmd} -median 3 -threshold 110% ${tmpOutput.replace('%d', '4')}`,
-    `${baseCmd} -median 3 -threshold 130% ${tmpOutput.replace('%d', '5')}`,
-    `${baseCmd} -median 3 -negate -threshold 80% ${tmpOutput.replace('%d', '6')}`,
-    `${baseCmd} -median 3 -negate -threshold 90% ${tmpOutput.replace('%d', '7')}`,
-    `${baseCmd} -resize 300% ${tmpOutput.replace('%d', '8')}`,
-    `${baseCmd} -resize 300% -median 3 -threshold 100% ${tmpOutput.replace('%d', '9')}`,
-  ];
-
-  for (const cmd of cmds) {
-    try {
-      execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'] });
-    } catch (e) {
-      continue;
-    }
-  }
-
-  for (let i = 0; i < 10; i++) {
-    const path = tmpOutput.replace('%d', String(i));
-    if (fs.existsSync(path)) {
-      const data = fs.readFileSync(path);
-      if (data.length > 0) variants.push(data);
-    }
-  }
-
-  try { fs.unlinkSync(tmpInput); } catch (e) {}
-  for (let i = 0; i < 10; i++) {
-    try { fs.unlinkSync(tmpOutput.replace('%d', String(i))); } catch (e) {}
-  }
-
-  return variants;
-}
-
-async function solveWithTesseract(imageBuffer) {
-  const worker = createWorker({
-    logger: m => {}
-  });
-
-  await worker.load();
-  await worker.loadLanguage('eng');
-  await worker.initialize('eng');
-  await worker.setParameters({
-    tessedit_pageseg_mode: '8',
-    tessedit_char_whitelist: '0123456789'
-  });
-
+async function ocrBuffer(worker, imageBuffer, psm) {
   try {
-    const { data } = await worker.recognize(imageBuffer);
-    const text = data.text.replace(/\s/g, '').replace(/[^0-9]/g, '');
+    const { data } = await worker.recognize(imageBuffer, {
+      tessedit_pageseg_mode: psm,
+      tessedit_char_whitelist: '0123456789',
+      tessedit_char_blacklist: '',
+      load_system_dictionary: 'F',
+      load_freq_dawg: 'F',
+      load_punc_dawg: 'F',
+    });
+    const text = (data.text || '').replace(/\s/g, '').replace(/[^0-9]/g, '');
     return text;
   } catch (e) {
     return '';
-  } finally {
-    await worker.terminate();
   }
 }
 
@@ -100,23 +41,27 @@ async function main() {
     process.exit(1);
   }
 
+  const worker = createWorker({ logger: m => {} });
+
   try {
-    const variants = await preprocessImage(rawBytes);
+    await worker.load();
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
 
-    if (variants.length === 0) {
-      process.exit(1);
-    }
-
+    const psmModes = ['8', '13', '7', '6', '10'];
     const predictions = [];
 
-    for (const variant of variants) {
-      const text = await solveWithTesseract(variant);
+    for (const psm of psmModes) {
+      const text = await ocrBuffer(worker, rawBytes, psm);
       if (text && text.length >= 4) {
         predictions.push(text);
       }
     }
 
+    await worker.terminate();
+
     if (predictions.length === 0) {
+      process.stderr.write('[CAPTCHA-DEBUG] tesseract.js returned no valid predictions\n');
       process.exit(1);
     }
 
@@ -140,6 +85,8 @@ async function main() {
 
     process.exit(1);
   } catch (e) {
+    process.stderr.write('[CAPTCHA-DEBUG] tesseract.js error: ' + e.message + '\n');
+    try { await worker.terminate(); } catch (e2) {}
     process.exit(1);
   }
 }
