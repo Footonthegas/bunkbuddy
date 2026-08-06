@@ -9,3 +9,6 @@ services:
     healthCheck:
       path: /api/health
       interval: 30
+    envVars:
+      - key: NODE_ENV
+        value: production

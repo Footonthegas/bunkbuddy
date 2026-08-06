@@ -54,6 +54,10 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Apply security rate limits for strict server protection
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
