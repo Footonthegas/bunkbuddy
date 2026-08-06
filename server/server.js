@@ -171,6 +171,9 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       const rh = await fetchResultHubNode(rollNumber);
       if (rh && rh.success) {
         history = rh.history;
+        if (rh.history?.cgpa) {
+          normalized.home.profile.cgpa = rh.history.cgpa;
+        }
       }
     } catch (e) {
       console.error('[LOGIN] ResultHub fetch failed:', e.message);
@@ -219,6 +222,9 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
             const rh = await fetchResultHubNode(rollNumber);
             if (rh && rh.success) {
               history = rh.history;
+              if (rh.history?.cgpa) {
+                normalizedNode.home.profile.cgpa = rh.history.cgpa;
+              }
             }
           } catch (e) {
             console.error('[LOGIN] ResultHub fetch failed:', e.message);
@@ -327,6 +333,21 @@ app.post('/api/data/refresh', async (req, res) => {
       console.log(`[REFRESH] Attempting Go Scraper for ${session.rollNumber}...`);
       const goJson = await runGoScraper(session.rollNumber, pwd, targetYear, targetSem);
       const normalized = normalizeGoResult(goJson);
+
+      if (!session.history || Object.keys(session.history).length === 0) {
+        try {
+          const rh = await fetchResultHubNode(session.rollNumber);
+          if (rh && rh.success) {
+            session.history = rh.history;
+            if (rh.history?.cgpa) {
+              normalized.home.profile.cgpa = rh.history.cgpa;
+            }
+          }
+        } catch (e) {
+          console.error('[REFRESH] ResultHub fetch failed:', e.message);
+        }
+      }
+
       session.data = normalized;
       session.year = targetYear;
       session.semester = targetSem;
@@ -344,6 +365,21 @@ app.post('/api/data/refresh', async (req, res) => {
           const nodeResult = await scrapeWithNode(session.rollNumber, pwd, targetYear, targetSem);
           if (nodeResult && nodeResult.status === 'success') {
             const normalizedNode = normalizeNodeResult(nodeResult);
+
+            if (!session.history || Object.keys(session.history).length === 0) {
+              try {
+                const rh = await fetchResultHubNode(session.rollNumber);
+                if (rh && rh.success) {
+                  session.history = rh.history;
+                  if (rh.history?.cgpa) {
+                    normalizedNode.home.profile.cgpa = rh.history.cgpa;
+                  }
+                }
+              } catch (e) {
+                console.error('[REFRESH] ResultHub fetch failed:', e.message);
+              }
+            }
+
             session.data = normalizedNode;
             session.year = targetYear;
             session.semester = targetSem;

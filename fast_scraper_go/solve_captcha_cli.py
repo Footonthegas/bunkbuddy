@@ -48,10 +48,8 @@ def _build_variants(raw_bytes):
     denoised = base.filter(ImageFilter.MedianFilter(size=3))
     variants.append(denoised)
 
-    for threshold in (80, 100, 120, 140, 160, 180):
-        bw = denoised.point(lambda p, t=threshold: 255 if p > t else 0).convert("L")
-        variants.append(bw)
-        variants.append(ImageOps.invert(bw))
+    bw = denoised.point(lambda p: 255 if p > 128 else 0).convert("L")
+    variants.append(bw)
 
     out = []
     seen = set()
@@ -86,6 +84,9 @@ def solve(raw_bytes):
             print(f"[CAPTCHA-PY-DEBUG] variant {i}: raw={raw!r} digits={digits!r}", file=sys.stderr, flush=True)
             if digits:
                 predictions.append(digits)
+                if len(digits) == EXPECTED_CAPTCHA_LEN:
+                    print(f"[CAPTCHA-PY-DEBUG] early exit on variant {i}", file=sys.stderr, flush=True)
+                    return digits
         except Exception as e:
             print(f"[CAPTCHA-PY-DEBUG] variant {i} failed: {e}", file=sys.stderr, flush=True)
             continue

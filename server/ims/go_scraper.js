@@ -146,12 +146,28 @@ export function normalizeGoResult(goJson, semester = '1') {
 
   const subjectNameMap = new Map(Object.entries(subjectNames));
 
-  function mapSubject(subject) {
-    if (!subject) return subject;
-    if (subjectNameMap.has(subject)) {
-      return subjectNameMap.get(subject);
-    }
-    return subject;
+   function mapSubject(subject) {
+     if (!subject) return subject;
+     if (subjectNameMap.has(subject)) {
+       return subjectNameMap.get(subject);
+     }
+     return subject;
+   }
+
+  const dayMap = {
+    'monday': 'Mon', 'mon': 'Mon', 'm': 'Mon',
+    'tuesday': 'Tue', 'tue': 'Tue', 'tues': 'Tue', 'tu': 'Tue',
+    'wednesday': 'Wed', 'wed': 'Wed', 'w': 'Wed',
+    'thursday': 'Thu', 'thur': 'Thu', 'thu': 'Thu', 'thurs': 'Thu',
+    'friday': 'Fri', 'fri': 'Fri', 'f': 'Fri',
+    'saturday': 'Sat', 'sat': 'Sat', 'sa': 'Sat',
+    'sunday': 'Sun', 'sun': 'Sun', 'su': 'Sun',
+  };
+
+  function normalizeDay(day) {
+    const lower = day.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (dayMap[lower]) return dayMap[lower];
+    return null;
   }
 
   const mappedTodayTimetable = todayTimetable.map(slot => ({
@@ -160,12 +176,19 @@ export function normalizeGoResult(goJson, semester = '1') {
   }));
 
   const mappedWeekTimetable = {};
+  const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   for (const [day, slots] of Object.entries(weekTimetable)) {
-    mappedWeekTimetable[day] = slots.map(slot => ({
+    const normDay = normalizeDay(day);
+    if (!normDay) continue;
+    mappedWeekTimetable[normDay] = slots.map(slot => ({
       time: slot.time,
       subject: mapSubject(slot.subject),
     }));
   }
+  for (const d of dayOrder) {
+    if (!mappedWeekTimetable[d]) mappedWeekTimetable[d] = [];
+  }
+
 
   return {
     home,
@@ -311,11 +334,30 @@ export function normalizeNodeResult(nodeJson) {
   }));
 
   const mappedWeek = {};
+  const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayMap = {
+    'monday': 'Mon', 'mon': 'Mon', 'm': 'Mon',
+    'tuesday': 'Tue', 'tue': 'Tue', 'tues': 'Tue', 'tu': 'Tue',
+    'wednesday': 'Wed', 'wed': 'Wed', 'w': 'Wed',
+    'thursday': 'Thu', 'thur': 'Thu', 'thu': 'Thu', 'thurs': 'Thu',
+    'friday': 'Fri', 'fri': 'Fri', 'f': 'Fri',
+    'saturday': 'Sat', 'sat': 'Sat', 'sa': 'Sat',
+    'sunday': 'Sun', 'sun': 'Sun', 'su': 'Sun',
+  };
+  function normalizeDay(day) {
+    const lower = day.toLowerCase().replace(/\s+/g, ' ').trim();
+    return dayMap[lower] || null;
+  }
   for (const [day, slots] of Object.entries(data.timetable_week || {})) {
-    mappedWeek[day] = slots.map(slot => ({
+    const normDay = normalizeDay(day);
+    if (!normDay) continue;
+    mappedWeek[normDay] = slots.map(slot => ({
       time: slot.time,
       subject: mapSubject(slot.subject),
     }));
+  }
+  for (const d of dayOrder) {
+    if (!mappedWeek[d]) mappedWeek[d] = [];
   }
 
   return {
