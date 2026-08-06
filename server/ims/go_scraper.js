@@ -8,10 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..', '..');
 
 const GO_BIN = process.env.GO_SCRAPER_BIN || (() => {
-  const candidates = [
-    path.join(ROOT, 'fast_scraper_go', 'fast_scraper_go.exe'),
-    path.join(ROOT, 'fast_scraper_go', 'fast_scraper_go'),
-  ];
+  const exe = path.join(ROOT, 'fast_scraper_go', 'fast_scraper_go.exe');
+  const bare = path.join(ROOT, 'fast_scraper_go', 'fast_scraper_go');
+  const candidates = process.platform === 'win32' ? [exe, bare] : [bare, exe];
   for (const c of candidates) {
     if (existsSync(c)) return c;
   }
