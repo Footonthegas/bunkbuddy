@@ -21,6 +21,14 @@ EXPECTED_CAPTCHA_LEN = 5
 try:
     _ocr = ddddocr.DdddOcr(show_ad=False, old_model=True)
     print(f"[CAPTCHA-PY-DEBUG] ddddocr old_model loaded", file=sys.stderr, flush=True)
+except TypeError:
+    print(f"[CAPTCHA-PY-DEBUG] old_model not supported, using default model", file=sys.stderr, flush=True)
+    try:
+        _ocr = ddddocr.DdddOcr(show_ad=False)
+        print(f"[CAPTCHA-PY-DEBUG] ddddocr default model loaded", file=sys.stderr, flush=True)
+    except Exception as e2:
+        print(f"[CAPTCHA-PY-DEBUG] ddddocr init failed: {e2}", file=sys.stderr, flush=True)
+        _ocr = None
 except Exception as e:
     print(f"[CAPTCHA-PY-DEBUG] ddddocr init failed: {e}", file=sys.stderr, flush=True)
     _ocr = None

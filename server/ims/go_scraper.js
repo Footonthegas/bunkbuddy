@@ -60,6 +60,10 @@ export async function runGoScraper(rollNumber, password, year, semester) {
     });
 
     proc.on('close', (code) => {
+      if (stderr.trim()) {
+        console.error(`[GO-SCRAPER] stderr: ${stderr.trim()}`);
+      }
+
       if (code !== 0 && code !== null) {
         const errMsg = stderr.trim() || `Process exited with code ${code}`;
         reject(new Error(`Go scraper failed (${code}): ${errMsg}`));
@@ -246,5 +250,83 @@ function buildDetailedAttendance(attendanceMap, timeline, subjectNames, courses)
     subjects,
     summary: { totalClasses, totalAbsent, totalPresent, percentages },
     legend,
+  };
+}
+
+export function normalizeNodeResult(nodeJson) {
+  const data = nodeJson?.data || {};
+  const attendanceMap = {};
+  (data.attendance || []).forEach(a => {
+    attendanceMap[a.code || a.subject] = {
+      total: parseInt(a.total) || 0,
+      present: parseInt(a.attended) || 0,
+      absent: parseInt(a.absent) || ((parseInt(a.total) || 0) - (parseInt(a.attended) || 0)),
+    };
+  });
+
+  const subjectNames = {};
+  (data.courses || []).forEach(c => {
+    if (c.code && c.name) subjectNames[c.code] = c.name;
+  });
+
+  const attendance = (data.attendance || []).map(a => {
+    const present = parseInt(a.attended) || 0;
+    const total = parseInt(a.total) || 0;
+    const absent = parseInt(a.absent) || (total - present);
+    const pct = total > 0 ? ((present / total) * 100).toFixed(2) + '%' : '0%';
+    let statusText = 'On Track';
+    let statusNumber = 0;
+    if (total > 0) {
+      const bunkable = Math.floor((4 / 3) * present - total);
+      if (bunkable >= 0) {
+        statusText = 'bunkable';
+        statusNumber = bunkable;
+      } else {
+        statusText = 'needed';
+        statusNumber = Math.ceil(3 * total - 4 * present);
+      }
+    }
+    return {
+      subject: subjectNames[a.code || a.subject] || a.subject,
+      attended: String(present),
+      absent: String(absent),
+      total: String(total),
+      percentage: pct,
+      statusText,
+      statusNumber,
+    };
+  });
+
+  const home = data.home || {
+    profile: { name: 'Student', program: 'B.Tech', cgpa: '--', semester: '1' },
+    summary: attendance.slice(0, 4),
+  };
+
+  const subjectNameMap = new Map(Object.entries(subjectNames));
+  const mapSubject = (s) => !s ? s : (subjectNameMap.has(s) ? subjectNameMap.get(s) : s);
+
+  const mappedToday = (data.timetable_today || []).map(slot => ({
+    time: slot.time,
+    subject: mapSubject(slot.subject),
+  }));
+
+  const mappedWeek = {};
+  for (const [day, slots] of Object.entries(data.timetable_week || {})) {
+    mappedWeek[day] = slots.map(slot => ({
+      time: slot.time,
+      subject: mapSubject(slot.subject),
+    }));
+  }
+
+  return {
+    home,
+    attendance,
+    detailedAttendance: data.detailedAttendance || null,
+    resources: data.resources || [],
+    connect: data.connect || [],
+    todayTimetable: mappedToday,
+    weekTimetable: mappedWeek,
+    subjectNames,
+    courses: data.courses || [],
   };
 }

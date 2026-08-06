@@ -10,7 +10,8 @@ import { loginToIms } from './ims/login.js';
 import { scrapeStudentData, fetchResultHubBatch, fetchStudentDetailedProfile } from './ims/scraper.js';
 import { sessionCache } from '../experimental/session_cache.js';
 import { pooledLoginAndScrape, fastRefreshWithCookies, browserPool } from '../experimental/browser_pool.js';
-import { runGoScraper, normalizeGoResult, isGoScraperAvailable } from './ims/go_scraper.js';
+import { runGoScraper, normalizeGoResult, normalizeNodeResult, isGoScraperAvailable } from './ims/go_scraper.js';
+import { scrapeWithNode } from './ims/node_scraper.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -204,6 +205,55 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       loginFailed = true;
     }
     console.error(`[LOGIN] ❌ Go scraper failed for ${rollNumber}: ${err.message}`);
+
+    if (!loginFailed && isGoScraperAvailable()) {
+      console.log(`[LOGIN] Falling back to Node.js scraper for ${rollNumber}...`);
+      try {
+        const nodeResult = await scrapeWithNode(rollNumber, password, year, semester);
+        if (nodeResult && nodeResult.status === 'success') {
+          const normalizedNode = normalizeNodeResult(nodeResult);
+          const sessionId = uuidv4();
+
+          let history = null;
+          try {
+            const rh = await fetchResultHubNode(rollNumber);
+            if (rh && rh.success) {
+              history = rh.history;
+            }
+          } catch (e) {
+            console.error('[LOGIN] ResultHub fetch failed:', e.message);
+          }
+
+          const sessionPayload = {
+            sessionId,
+            rollNumber,
+            data: normalizedNode,
+            history,
+            cookies: [],
+            cookieJar: null,
+            password: password,
+            semester: semester || '1',
+            year: year || '2026-27'
+          };
+
+          sessions.set(sessionId, sessionPayload);
+          sessionCache.setSession(rollNumber, sessionPayload, semester, year);
+
+          console.log(`[LOGIN] ✅ Node.js scraper completed for ${rollNumber} (${normalizedNode.attendance.length} subjects)!`);
+          return res.json({
+            success: true,
+            sessionId,
+            rollNumber,
+            data: normalizedNode,
+            history,
+            mode: 'node-scraper'
+          });
+        }
+      } catch (nodeErr) {
+        console.error(`[LOGIN] ❌ Node.js scraper also failed for ${rollNumber}: ${nodeErr.message}`);
+      }
+    }
+
     return res.status(loginFailed ? 401 : 500).json({
       success: false,
       message: loginFailed ? 'Invalid roll number or password.' : (err.message || 'Scraper failed. Please try again.'),
@@ -287,6 +337,23 @@ app.post('/api/data/refresh', async (req, res) => {
         refreshLoginFailed = true;
       }
       console.error(`[REFRESH] Go scraper failed for ${session.rollNumber}: ${goErr.message}`);
+
+      if (!refreshLoginFailed && isGoScraperAvailable()) {
+        console.log(`[REFRESH] Falling back to Node.js scraper for ${session.rollNumber}...`);
+        try {
+          const nodeResult = await scrapeWithNode(session.rollNumber, pwd, targetYear, targetSem);
+          if (nodeResult && nodeResult.status === 'success') {
+            const normalizedNode = normalizeNodeResult(nodeResult);
+            session.data = normalizedNode;
+            session.year = targetYear;
+            session.semester = targetSem;
+            return res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'node-refresh' });
+          }
+        } catch (nodeErr) {
+          console.error(`[REFRESH] ❌ Node.js scraper also failed for ${session.rollNumber}: ${nodeErr.message}`);
+        }
+      }
+
       const status = refreshLoginFailed ? 401 : 500;
       return res.status(status).json({
         success: false,

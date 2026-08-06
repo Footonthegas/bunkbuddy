@@ -309,14 +309,16 @@ async function loginToIms(rollNumber, password) {
       'Upgrade-Insecure-Requests': '1',
     },
     maxRedirects: 0,
-    validateStatus: (s) => s === 302,
+    validateStatus: (s) => s === 302 || s === 200,
   });
 
-  if (loginResp.status !== 302) {
-    throw new Error('Login failed: Invalid roll number or password');
+  const loginHtml = (loginResp.data || '').toString();
+  const loginLower = loginHtml.toLowerCase();
+  if (loginResp.status === 302 || (loginLower.includes('logout') && loginLower.includes('my activities'))) {
+    return { success: true };
   }
 
-  return { success: true };
+  throw new Error('Login failed: Invalid roll number or password');
 }
 
 async function navigateToAttendance(year, semester) {
