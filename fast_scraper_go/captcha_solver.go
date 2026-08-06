@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	captchaTimeout = 10 * time.Second
+	captchaTimeout = 30 * time.Second
 )
 
 func solveCaptchaGo(captchaBytes []byte) string {
@@ -20,12 +20,21 @@ func solveCaptchaGo(captchaBytes []byte) string {
 		return ""
 	}
 
-	pythonBin := findPythonBinary()
-	if pythonBin == "" {
-		return ""
+	var cmd *exec.Cmd
+	if strings.HasSuffix(scriptPath, ".js") {
+		nodeBin := findNodeBinary()
+		if nodeBin == "" {
+			return ""
+		}
+		cmd = exec.Command(nodeBin, scriptPath)
+	} else {
+		pythonBin := findPythonBinary()
+		if pythonBin == "" {
+			return ""
+		}
+		cmd = exec.Command(pythonBin, scriptPath)
 	}
 
-	cmd := exec.Command(pythonBin, scriptPath)
 	cmd.Stdin = bytes.NewReader(captchaBytes)
 
 	var stdout bytes.Buffer
@@ -59,7 +68,12 @@ func findCaptchaSolverScript() string {
 		}
 	}
 
-	candidates := []string{
+	jsCandidates := []string{
+		"solve_captcha.js",
+		"../solve_captcha.js",
+		"../../solve_captcha.js",
+	}
+	pyCandidates := []string{
 		"solve_captcha_cli.py",
 		"../solve_captcha_cli.py",
 		"../../solve_captcha_cli.py",
@@ -67,7 +81,11 @@ func findCaptchaSolverScript() string {
 
 	if exe, err := os.Executable(); err == nil {
 		exeDir := filepath.Dir(exe)
-		candidates = append(candidates,
+		jsCandidates = append(jsCandidates,
+			filepath.Join(exeDir, "solve_captcha.js"),
+			filepath.Join(exeDir, "..", "solve_captcha.js"),
+		)
+		pyCandidates = append(pyCandidates,
 			filepath.Join(exeDir, "solve_captcha_cli.py"),
 			filepath.Join(exeDir, "..", "solve_captcha_cli.py"),
 		)
@@ -75,19 +93,33 @@ func findCaptchaSolverScript() string {
 
 	wd, err := os.Getwd()
 	if err == nil {
-		candidates = append(candidates,
+		jsCandidates = append(jsCandidates,
+			filepath.Join(wd, "solve_captcha.js"),
+			filepath.Join(wd, "..", "solve_captcha.js"),
+		)
+		pyCandidates = append(pyCandidates,
 			filepath.Join(wd, "solve_captcha_cli.py"),
 			filepath.Join(wd, "..", "solve_captcha_cli.py"),
 		)
 	}
 
-	for _, c := range candidates {
+	allCandidates := append(jsCandidates, pyCandidates...)
+	for _, c := range allCandidates {
 		abs, _ := filepath.Abs(c)
 		if _, err := os.Stat(abs); err == nil {
 			return abs
 		}
 	}
 
+	return ""
+}
+
+func findNodeBinary() string {
+	for _, name := range []string{"node", "nodejs"} {
+		if p, err := exec.LookPath(name); err == nil && p != "" {
+			return p
+		}
+	}
 	return ""
 }
 
