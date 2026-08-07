@@ -129,7 +129,13 @@ export function normalizeGoResult(goJson, semester = '1') {
   for (const c of courses) {
     if (c.code && c.name) courseNameMap[c.code.toUpperCase()] = c.name;
   }
-  const allNames = { ...subjectNames, ...courseNameMap };
+  const allNames = {};
+  for (const [k, v] of Object.entries(subjectNames)) {
+    allNames[k.toUpperCase()] = v;
+  }
+  for (const [k, v] of Object.entries(courseNameMap)) {
+    allNames[k] = v;
+  }
 
   const attendance = Object.entries(attendanceMap).map(([code, counts]) => {
     const present = counts.present || 0;
@@ -148,9 +154,10 @@ export function normalizeGoResult(goJson, semester = '1') {
         statusNumber = Math.ceil(3 * total - 4 * present);
       }
     }
+    const upperCode = code.toUpperCase();
     return {
-      code: code.toUpperCase(),
-      subject: allNames[code.toUpperCase()] || code,
+      code: upperCode,
+      subject: allNames[upperCode] || code,
       attended: String(present),
       absent: String(absent),
       total: String(total),
@@ -329,8 +336,12 @@ export function normalizeNodeResult(nodeJson) {
   });
 
   const subjectNames = {};
+  const rawSubjectNames = (data.subject_names && typeof data.subject_names === 'object') ? data.subject_names : {};
+  for (const [k, v] of Object.entries(rawSubjectNames)) {
+    subjectNames[k.toUpperCase()] = v;
+  }
   (data.courses || []).forEach(c => {
-    if (c.code && c.name) subjectNames[c.code] = c.name;
+    if (c.code && c.name) subjectNames[c.code.toUpperCase()] = c.name;
   });
 
   const attendance = (data.attendance || []).map(a => {
@@ -350,9 +361,10 @@ export function normalizeNodeResult(nodeJson) {
         statusNumber = Math.ceil(3 * total - 4 * present);
       }
     }
+    const upperCode = (a.code || a.subject || '').toUpperCase();
     return {
-      code: (a.code || a.subject || '').toUpperCase(),
-      subject: subjectNames[a.code] || a.subject,
+      code: upperCode,
+      subject: subjectNames[upperCode] || a.subject,
       attended: String(present),
       absent: String(absent),
       total: String(total),

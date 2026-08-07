@@ -55,14 +55,6 @@ func extractRoom(raw string) string {
 	return ""
 }
 
-func hasBatchGroupSectionMarkers(text string) bool {
-	lower := strings.ToLower(text)
-	hasBatch := regexp.MustCompile(`(?i)bat\s*[:\- ]\s*\d+`).MatchString(lower)
-	hasGroup := regexp.MustCompile(`(?i)grp\s*[- ]?\s*\d+`).MatchString(lower)
-	hasSection := regexp.MustCompile(`(?i)sec\s*[:\- ]\s*\d+`).MatchString(lower)
-	return hasBatch || hasGroup || hasSection
-}
-
 func parseRegisteredCourses(html string) []RegisteredCourse {
 	if html == "" {
 		return nil
@@ -553,77 +545,92 @@ func pickSubjectForSlot(rawCell string, registered []RegisteredCourse) string {
 		return ""
 	}
 
-	type matchResult struct {
-		course RegisteredCourse
-		byCode bool
-		disq   bool
-		isLab  bool
-	}
-	var results []matchResult
-	seen := make(map[string]bool)
+	compressed := regexp.MustCompile(`(?i)(?:sem\s*[:\-]?\s*\d+.*?bat\s*[:\-]?\s*\d+)`).ReplaceAllString(raw, " ")
+	compressed = regexp.MustCompile(`\s{2,}`).ReplaceAllString(compressed, " ")
+	compressed = strings.TrimSpace(compressed)
 
-	codeMatches := regexp.MustCompile(`\b([A-Z]{2,}[A-Z0-9]*\d{2,})\b`).FindAllString(raw, -1)
+	rawLower := strings.ToLower(raw)
+	for _, c := range registered {
+		if c.Name != "" && rawLower == strings.ToLower(c.Name) {
+			return c.Name
+		}
+		if c.Name != "" && strings.Contains(rawLower, strings.ToLower(c.Name)) {
+			return c.Name
+		}
+	}
+
+	searchText := compressed
+	codeMatches := regexp.MustCompile(`\b([A-Z]{2,}[A-Z0-9]*\d{2,})\b`).FindAllString(searchText, -1)
 	if len(codeMatches) == 0 {
-		codeMatches = regexp.MustCompile(`([A-Z]{2,}[A-Z0-9]*\d{2,})`).FindAllString(raw, -1)
+		codeMatches = regexp.MustCompile(`([A-Z]{2,}[A-Z0-9]*\d{2,})`).FindAllString(searchText, -1)
 	}
 	regMap := make(map[string]RegisteredCourse)
 	for _, c := range registered {
 		regMap[c.Code] = c
 	}
-	for _, cm := range codeMatches {
-		cu := strings.ToUpper(cm)
+	var uniqueCodes []string
+	seen := make(map[string]bool)
+	for _, c := range codeMatches {
+		cu := strings.ToUpper(c)
 		if regMap[cu] != (RegisteredCourse{}) && !seen[cu] {
-			results = append(results, matchResult{course: regMap[cu], byCode: true})
+			uniqueCodes = append(uniqueCodes, cu)
 			seen[cu] = true
 		}
 	}
 
-	if len(results) == 0 {
+	if len(uniqueCodes) == 0 {
 		for _, c := range registered {
-			if c.Name != "" && strings.Contains(lower, strings.ToLower(c.Name)) {
-				results = append(results, matchResult{course: c, byCode: false})
+			if c.Name != "" && strings.Contains(rawLower, strings.ToLower(c.Name)) {
+				return c.Name
 			}
 		}
+		return normalizeSubjectFromSlot(raw)
 	}
 
-	if len(results) == 0 {
-		return ""
+	type matchResult struct {
+		code     string
+		name     string
+		isLab    bool
+		disq     bool
 	}
+	var results []matchResult
 
-	var matchedResults []matchResult
-	for i := range results {
-		r := &results[i]
-		r.disq = false
-		r.isLab = false
-
+	for _, code := range uniqueCodes {
+		reg := regMap[code]
 		slotText := raw
-		allBatchHits := regexp.MustCompile(`(?i)bat\s*[:\- ]\s*(\d+)`).FindAllStringSubmatch(slotText, -1)
-		allGroupHits := regexp.MustCompile(`(?i)grp\s*[- ]?\s*(\d+)`).FindAllStringSubmatch(slotText, -1)
-		secHit := regexp.MustCompile(`(?i)sec\s*[:\- ]\s*(\d+)`).FindStringSubmatch(slotText)
+		disq := false
+		isLab := false
+		matched := false
+
+		allBatchHits := regexp.MustCompile(`(?i)`+regexp.QuoteMeta(code)+`[^\n]*?bat\s*[:\- ]\s*(\d+)`).FindAllStringSubmatch(slotText, -1)
+		allGroupHits := regexp.MustCompile(`(?i)`+regexp.QuoteMeta(code)+`[^\n]*?grp\s*[- ]?\s*(\d+)`).FindAllStringSubmatch(slotText, -1)
+		secHit := regexp.MustCompile(`(?i)`+regexp.QuoteMeta(code)+`[^\n]*?sec\s*[:\- ]\s*(\d+)`).FindStringSubmatch(slotText)
 
 		hasAnyBatchMarker := len(allBatchHits) > 0
 		hasAnyGroupMarker := len(allGroupHits) > 0
 		hasAnySectionMarker := len(secHit) >= 2
 
-		if r.course.Batch != "" {
+		if reg.Batch != "" {
 			if hasAnyBatchMarker {
 				found := false
 				for _, bh := range allBatchHits {
-					if len(bh) >= 2 && strings.TrimSpace(bh[1]) == r.course.Batch {
+					if len(bh) >= 2 && strings.TrimSpace(bh[1]) == reg.Batch {
 						found = true
 						break
 					}
 				}
-				if !found {
-					r.disq = true
+				if found {
+					matched = true
+				} else {
+					disq = true
 				}
 			}
 		} else if hasAnyBatchMarker {
-			r.disq = true
+			disq = true
 		}
 
-		if !r.disq && r.course.Group != "" {
-			grpNum := strings.Split(r.course.Group, "-")
+		if !disq && reg.Group != "" {
+			grpNum := strings.Split(reg.Group, "-")
 			last := grpNum[len(grpNum)-1]
 			if hasAnyGroupMarker {
 				found := false
@@ -634,51 +641,87 @@ func pickSubjectForSlot(rawCell string, registered []RegisteredCourse) string {
 					}
 				}
 				if found {
+					matched = true
 					if regexp.MustCompile(`(?i)grp\s*[- ]?\s*\d+`).MatchString(slotText) {
-						r.isLab = true
+						isLab = true
 					}
 				} else {
-					r.disq = true
+					disq = true
 				}
 			}
-		} else if !r.disq && hasAnyGroupMarker {
-			r.disq = true
+		} else if !disq && hasAnyGroupMarker {
+			disq = true
 		}
 
-		if !r.disq && r.course.Section != "" {
+		if !disq && !matched && reg.Section != "" {
 			if hasAnyBatchMarker || hasAnyGroupMarker {
-				r.disq = true
+				disq = true
 			} else if hasAnySectionMarker {
-				if strings.TrimSpace(secHit[1]) != r.course.Section {
-					r.disq = true
+				if strings.TrimSpace(secHit[1]) != reg.Section {
+					disq = true
+				} else {
+					matched = true
 				}
 			}
 		}
 
+		if !disq && !matched {
+			if hasAnyBatchMarker || hasAnyGroupMarker || hasAnySectionMarker {
+				disq = true
+			} else {
+				matched = true
+			}
+		}
+
+		name := reg.Name
+		if name == "" {
+			name = code
+		}
+
+		results = append(results, matchResult{
+			code:  code,
+			name:  name,
+			isLab: isLab,
+			disq:  disq,
+		})
+	}
+
+	var matchedResults []matchResult
+	for _, r := range results {
 		if !r.disq {
-			matchedResults = append(matchedResults, *r)
+			matchedResults = append(matchedResults, r)
 		}
 	}
 
 	if len(matchedResults) == 0 {
-		return ""
+		for _, c := range registered {
+			if c.Name != "" && strings.Contains(rawLower, strings.ToLower(c.Name)) {
+				return c.Name
+			}
+		}
+		fallback := normalizeSubjectFromSlot(raw)
+		if fallback != "" {
+			return fallback
+		}
+		return raw
 	}
 
 	if len(matchedResults) == 1 {
 		r := matchedResults[0]
 		if r.isLab {
-			return r.course.Name + " Lab"
+			return r.name + " Lab"
 		}
-		return r.course.Name
+		return r.name
 	}
 
 	for _, r := range matchedResults {
 		if r.isLab {
-			return r.course.Name + " Lab"
+			return r.name + " Lab"
 		}
 	}
 
-	return matchedResults[0].course.Name
+	first := matchedResults[0]
+	return first.name
 }
 
 func parseTimetable(html string, todayOnly bool, registered []RegisteredCourse) []TimetableSlot {
