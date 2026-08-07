@@ -38,6 +38,8 @@ export async function runGoScraper(rollNumber, password, year, semester) {
     console.error('[GO-SCRAPER] chmod failed:', e.message);
   }
 
+  const overallStart = Date.now();
+
   return new Promise((resolve, reject) => {
     const proc = spawn(GO_BIN, args, {
       windowsHide: true,
@@ -46,8 +48,10 @@ export async function runGoScraper(rollNumber, password, year, semester) {
 
     let stdout = '';
     let stderr = '';
+    let firstByteTime = null;
 
     proc.stdout.on('data', (d) => {
+      if (firstByteTime === null) firstByteTime = Date.now();
       stdout += d.toString();
     });
 
@@ -60,6 +64,7 @@ export async function runGoScraper(rollNumber, password, year, semester) {
     });
 
     proc.on('close', (code) => {
+      const overallMs = Date.now() - overallStart;
       const phases = [];
       const phaseRe = /\[PHASE\]\s*(.+?):\s*(\d+)ms/;
       for (const line of stderr.split('\n')) {
@@ -69,7 +74,9 @@ export async function runGoScraper(rollNumber, password, year, semester) {
         }
       }
       if (phases.length > 0) {
-        console.log(`[GO-SCRAPER] Timings: ${phases.map(p => `${p.phase} (${p.ms}ms)`).join(', ')}`);
+        console.log(`[GO-SCRAPER] Timings: ${phases.map(p => `${p.phase} (${p.ms}ms)`).join(', ')} | Total: ${overallMs}ms`);
+      } else {
+        console.log(`[GO-SCRAPER] Total elapsed: ${overallMs}ms (no phase breakdown available in --full mode)`);
       }
 
       if (stderr.trim()) {
@@ -91,8 +98,10 @@ export async function runGoScraper(rollNumber, password, year, semester) {
 
       try {
         const json = JSON.parse(trimmed);
-        if (phases.length > 0) {
-          json._timings = phases;
+        json._timings = phases;
+        json._elapsed_ms = overallMs;
+        if (firstByteTime) {
+          json._time_to_first_byte_ms = firstByteTime - overallStart;
         }
         resolve(json);
       } catch (e) {

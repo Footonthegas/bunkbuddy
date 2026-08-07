@@ -393,24 +393,28 @@ export async function parseAttendanceFromHtml(html) {
     return { attendance, detailedAttendance };
 }
 
-async function fetchResultHubData(browser, username) {
-    let cgpa = "N/A";
-    let semester = "N/A";
-    if (!username) return { cgpa, semester };
-    
+async function fetchResultHubData(browser, username, college = 'NSUT') {
+    const fallback = { cgpa: "N/A", semester: "N/A", name: undefined };
+    if (!username) return fallback;
+
     try {
-        const detailed = await fetchStudentDetailedProfile(username);
+        const detailed = await fetchStudentDetailedProfile(username, null, browser, college);
         if (detailed && detailed.success && detailed.history) {
             return {
                 name: detailed.history.name,
                 cgpa: detailed.history.cgpa || "N/A",
-                semester: "N/A"
+                semester: detailed.history.sgpa && detailed.history.sgpa.length > 0
+                    ? String(detailed.history.sgpa[detailed.history.sgpa.length - 1])
+                    : "N/A",
+                universityRank: detailed.history.universityRank || "--",
+                deptRank: detailed.history.deptRank || "--",
+                history: detailed.history,
             };
         }
     } catch (e) {
         console.error("ResultHub profile fallback failed:", e.message);
     }
-    return { cgpa, semester };
+    return fallback;
 }
 
 export async function fetchResultHubBatch(year, branch) {
@@ -444,48 +448,258 @@ export async function fetchResultHubBatch(year, branch) {
     return students;
 }
 
-export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = null, browser = null) {
+const RESULT_HUB_ACTION_ID = '706fa587127629876c510afaca5e6d3f567d3eae64';
+const RESULT_HUB_BUILD_ID = 'SbKHOquKG0d3jAbym6qAP';
+const RESULT_HUB_BASE = 'https://www.resulthubdtu.com';
+
+const SEMESTER_ORDER = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+const SEMESTER_SHORT = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'];
+
+function normalizeBranchForDisplay(branch) {
+    if (!branch) return 'B.Tech';
+    if (/Mechanical/.test(branch)) return 'Mechanical Engineering';
+    if (/Computer Science|COE|CSE|CSA|AI|ML|Data Science|Software/i.test(branch)) return 'Computer Science';
+    if (/Electronics|ECE|EEE|E CE/i.test(branch)) return 'Electronics & Comm.';
+    if (/Civil/i.test(branch)) return 'Civil Engineering';
+    if (/IT|Information Technology/i.test(branch)) return 'Information Technology';
+    return branch;
+}
+
+async function invokeResultHubServerAction(college, year, rollNumber) {
+    const pageUrl = `${RESULT_HUB_BASE}/${college}/StudentProfile/${year}/${rollNumber}`;
+    const stateTree = JSON.stringify({ P: null, b: RESULT_HUB_BUILD_ID, p: '', c: ['', college, 'StudentProfile', String(year), rollNumber], i: false });
+    const body = JSON.stringify([college, String(year), rollNumber]);
+
+    const res = await globalThis.fetch(pageUrl, {
+        method: 'POST',
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/x-component',
+            'Content-Type': 'text/plain',
+            'Next-Action': RESULT_HUB_ACTION_ID,
+            'Next-Router-State-Tree': stateTree,
+        },
+        body: body,
+        signal: AbortSignal.timeout(15000)
+    });
+
+    if (!res.ok) {
+        console.warn(`[RESULT-HUB] Server action POST returned HTTP ${res.status} for ${rollNumber}`);
+        return null;
+    }
+
+    const text = await res.text();
+    const lines = text.trim().split('\n');
+
+    for (const line of lines) {
+        if (line.startsWith('1:')) {
+            const jsonStr = line.substring(2);
+            try {
+                let parsed = JSON.parse(jsonStr);
+
+                if (parsed.result && Array.isArray(parsed.result) && parsed.result.length > 0) {
+                    parsed = parsed.result[0];
+                } else if (parsed.json) {
+                    parsed = parsed.json;
+                } else if (parsed.data) {
+                    parsed = parsed.data;
+                }
+
+                if (parsed && (parsed.Name || parsed.name || parsed.CUMULATIVE_GPA || parsed.cgpa)) {
+                    console.log(`[RESULT-HUB] Server action unwrapped data keys: ${Object.keys(parsed).slice(0, 10).join(', ')}...`);
+                    return parsed;
+                }
+
+                console.warn(`[RESULT-HUB] Server action returned unrecognized data structure: ${Object.keys(parsed).slice(0, 10).join(', ')}`);
+                return null;
+            } catch (e) {
+                console.warn('[RESULT-HUB] Failed to parse server action response:', e.message);
+                return null;
+            }
+        }
+    }
+
+    return null;
+}
+
+function getField(data, ...keys) {
+    for (const k of keys) {
+        if (data[k] !== undefined) return data[k];
+    }
+    return undefined;
+}
+
+function parseServerActionData(data, college, year, rollNumber) {
+    const history = {};
+
+    history.name = getField(data, 'Name', 'name', 'STUDENT_NAME') || 'Student';
+    history.rollNumber = getField(data, 'Roll_No', 'rollNumber', 'ROLL_NO') || rollNumber;
+    history.cgpa = getField(data, 'CUMULATIVE_GPA', 'cgpa', 'CUMULATIVE_CGPA', 'CGPA') || '--';
+    history.universityRank = getField(data, 'UNIVERSITY_RANK', 'universityRank', 'UNI_RANK', 'University_Rank');
+    history.deptRank = getField(data, 'DEPARTMENT_RANK', 'deptRank', 'DEPT_RANK', 'Department_Rank');
+    history.major = normalizeBranchForDisplay(getField(data, 'Branch', 'branch', 'BRANCH'));
+    history.college = getField(data, 'college', 'COLLEGE', 'College') || college;
+    history.year = String(year);
+    history.highest = getField(data, 'HIGHEST', 'highest', 'HIGHEST_CGPA') || null;
+    history.average = getField(data, 'AVERAGE', 'average', 'BRANCH_AVERAGE') || null;
+    history.percentile = getField(data, 'PERCENTILE', 'percentile') || null;
+    history.discipline = getField(data, 'Discipline', 'discipline') || null;
+    history.course = getField(data, 'Course', 'course') || null;
+
+    if (history.universityRank && !String(history.universityRank).startsWith('#')) {
+        history.universityRank = '#' + history.universityRank;
+    }
+    if (history.deptRank && !String(history.deptRank).startsWith('#')) {
+        history.deptRank = '#' + history.deptRank;
+    }
+
+    let totalCredits = 0;
+    let creditsFound = 0;
+    for (const sem of SEMESTER_ORDER) {
+        const creditsKey = `SEM_${sem}_CREDITS`;
+        const creditsVal = parseInt(getField(data, creditsKey, creditsKey.toLowerCase()), 10);
+        if (!isNaN(creditsVal) && creditsVal > 0) {
+            totalCredits += creditsVal;
+            creditsFound++;
+        }
+    }
+    history.credits = creditsFound > 0 ? String(totalCredits) : '--';
+
+    history.sgpa = [];
+    history.cgpaTrend = {};
+    history.semesters = {};
+
+    for (let i = 0; i < SEMESTER_ORDER.length; i++) {
+        const sem = SEMESTER_ORDER[i];
+        const short = SEMESTER_SHORT[i];
+        const sgpaKey = `SEM_${sem}`;
+        const sgpaVal = parseFloat(getField(data, sgpaKey, sgpaKey.toLowerCase(), short));
+
+        if (data[sgpaKey] !== undefined && sgpaVal > 0) {
+            history.sgpa.push(sgpaVal);
+            history.cgpaTrend[sem] = sgpaVal;
+        } else if (data[short] !== undefined && parseFloat(data[short]) > 0) {
+            history.sgpa.push(parseFloat(data[short]));
+            history.cgpaTrend[sem] = parseFloat(data[short]);
+        }
+
+        if (data._semesters && data._semesters[sem]) {
+            const semData = data._semesters[sem];
+            history.semesters[sem] = {
+                sgpa: semData.sgpa || null,
+                credits: semData.credits || null,
+                creditsSecured: semData.credits_secured || null,
+                failedCourses: semData.failed_courses || null,
+                grades: semData.grades || {},
+            };
+        }
+    }
+
+    if (data._cgpa_trend) {
+        history.cgpaTrend = data._cgpa_trend;
+    }
+
+    history.rankMovementUniversity = data.rank_movement_university || {};
+    history.rankMovementDepartment = data.rank_movement_department || {};
+    history.semesterRankUniversity = data.semester_rank_university || {};
+    history.semesterRankDepartment = data.semester_rank_department || {};
+
+    const subjects = {};
+    for (let i = 0; i < SEMESTER_ORDER.length; i++) {
+        const short = SEMESTER_SHORT[i];
+        const countKey = `${short}_SUBJECT_COUNT`;
+        const count = parseInt(getField(data, countKey, countKey.toLowerCase()), 10);
+        if (count > 0) {
+            const semSubjects = [];
+            for (let j = 1; j <= count; j++) {
+                const code = getField(data, `${short}_SUBJECT_${j}_CODE`, `${short}_subject_${j}_code`) || getField(data, `${short}_SUBJECT_${j}_NAME`, `${short}_subject_${j}_name`) || '';
+                const grade = getField(data, `${short}_SUBJECT_${j}_GRADE`, `${short}_subject_${j}_grade`) || '';
+                const name = getField(data, `${short}_SUBJECT_${j}_NAME`, `${short}_subject_${j}_name`) || code;
+                const combined = getField(data, `${short}_SUBJECT_${j}`, `${short}_subject_${j}`) || '';
+                semSubjects.push({
+                    code: code,
+                    name: name,
+                    grade: grade,
+                    subject: combined
+                });
+            }
+            subjects[short] = semSubjects;
+        }
+    }
+    history.subjects = subjects;
+
+    history.failedSubjects = {};
+    for (let i = 0; i < SEMESTER_ORDER.length; i++) {
+        const short = SEMESTER_SHORT[i];
+        const failedKey = `${short}_FAILED_SUBJECTS`;
+        if (data[failedKey] !== undefined && data[failedKey] !== '0') {
+            history.failedSubjects[short] = data[failedKey];
+        }
+    }
+
+    return history;
+}
+
+export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = null, browser = null, college = 'NSUT') {
     let year = 2028;
     if (rollNumber && rollNumber.startsWith('202')) {
         const startY = parseInt(rollNumber.substring(0,4));
         year = startY + 4;
     }
     const profile = { success: false, history: {} };
+
+    // ── Method 1: Invoke ResultHub Next.js Server Action (lookupStudent) ──────
+    // The server action returns full student data (CGPA, ranks, SGPA, credits, etc.)
+    // It uses the RSC flight protocol with Next-Action header
+    try {
+        const actionResult = await invokeResultHubServerAction(college, year, rollNumber);
+        if (actionResult && (actionResult.Name || actionResult.name || actionResult.CUMULATIVE_GPA || actionResult.cgpa)) {
+            const history = parseServerActionData(actionResult, college, year, rollNumber);
+            console.log(`[RESULT-HUB] Server action success for ${rollNumber}: ${history.name}, CGPA=${history.cgpa}, UniRank=${history.universityRank}, DeptRank=${history.deptRank}`);
+            profile.success = true;
+            profile.history = history;
+            profile.history.url = `https://www.resulthubdtu.com/${college}/StudentProfile/${year}/${rollNumber}`;
+            profile.analytics = actionResult.analytics || null;
+            profile.filters = actionResult.filters || null;
+            return profile;
+        } else if (actionResult && actionResult.error) {
+            console.warn(`[RESULT-HUB] Server action error for ${rollNumber}: ${actionResult.error}`);
+        }
+    } catch (e) {
+        console.warn(`[RESULT-HUB] Server action invocation failed for ${rollNumber}: ${e.message}`);
+    }
+
+    // ── Method 2: Fallback to HTML metadata extraction ────────────────────────
     try {
         let html = preFetchedHtml;
         let renderedText = null;
-        
-        // If browser is provided, use Puppeteer to get JS-rendered content
+
         if (!html && browser) {
-             try {
-                 const page = await browser.newPage();
-                 await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-                 
-                 await page.goto(`https://www.resulthubdtu.com/NSUT/StudentProfile/${year}/${rollNumber}`, { 
-                     waitUntil: 'networkidle0', 
-                     timeout: 30000 
-                 });
-                 
-                 renderedText = await page.evaluate(() => document.body.innerText);
-                 html = await page.content();
-                 await page.close().catch(() => {});
-             } catch (e) {
-                 console.warn(`[RESULT-HUB] Puppeteer fetch failed: ${e.message}`);
-             }
+            try {
+                const page = await browser.newPage();
+                await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                await page.goto(`https://www.resulthubdtu.com/${college}/StudentProfile/${year}/${rollNumber}`, {
+                    waitUntil: 'networkidle0',
+                    timeout: 30000
+                });
+                renderedText = await page.evaluate(() => document.body.innerText);
+                html = await page.content();
+                await page.close().catch(() => {});
+            } catch (e) {
+                console.warn(`[RESULT-HUB] Puppeteer fetch failed: ${e.message}`);
+            }
         }
-        
-        // Fallback to HTTP fetch if no HTML
+
         if (!html) {
-            const url = `https://www.resulthubdtu.com/NSUT/StudentProfile/${year}/${rollNumber}`;
+            const url = `https://www.resulthubdtu.com/${college}/StudentProfile/${year}/${rollNumber}`;
             const res = await globalThis.fetch(url, {
-                headers: { 
+                headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                     'Accept-Language': 'en-US,en;q=0.5',
                 },
                 signal: AbortSignal.timeout(15000)
             });
-
             if (!res.ok) {
                 console.warn(`[RESULT-HUB] HTTP ${res.status} for ${url}`);
                 return profile;
@@ -500,36 +714,34 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
         const ldJsonScript = $('script[type="application/ld+json"]').html() || '';
         const bodyText = $.text();
 
-        console.log(`[RESULT-HUB] Scraping profile for ${rollNumber} (year=${year})`);
-        
-        // Use rendered text if available (from Puppeteer), otherwise fall back to body text
-        const seed = renderedText 
+        console.log(`[RESULT-HUB] Fallback HTML scrape for ${rollNumber} (year=${year})`);
+
+        const seed = renderedText
             ? [metaDesc, ldJsonScript, renderedText].join('\n')
             : [metaDesc, ldJsonScript, bodyText].join('\n');
 
         let cgpaMatch = seed.match(/Cumulative CGPA[\s\n]*([\d\.]+)/i) || seed.match(/CGPA[:\s]+([\d]+\.[\d]+)/i);
         if (cgpaMatch) history.cgpa = cgpaMatch[1];
         else history.cgpa = '--';
-        
+
         let uniRankMatch = seed.match(/University Rank[:.\s]*#?(\d+)/i) || seed.match(/University[\s\n]+Rank[:.\s]*#?(\d+)/i);
         if (uniRankMatch) history.universityRank = '#' + uniRankMatch[1];
         else history.universityRank = '--';
-        
-        let deptRankMatch = seed.match(/Dept\.? Rank[\s\n]*#?(\d+)/i);
+
+        let deptRankMatch = seed.match(/Dept\.?\s*Rank[\s\n]*[:.]?\s*#?(\d+)/i);
         if (!deptRankMatch && renderedText) {
-            deptRankMatch = renderedText.match(/Dept\.?\s*Rank\s*#?(\d+)/i);
+            deptRankMatch = renderedText.match(/Dept\.?\s*Rank\s*[:.]?\s*#?(\d+)/i);
         }
         if (deptRankMatch) history.deptRank = '#' + deptRankMatch[1];
-        else history.deptRank = '--'; 
-        
+        else history.deptRank = '--';
+
         let creditsMatch = seed.match(/Credits Completed[\s\n]*(\d+)/i);
         if (!creditsMatch && renderedText) {
             creditsMatch = renderedText.match(/Credits Completed\s*(\d+)/i);
         }
         if (creditsMatch) history.credits = creditsMatch[1];
-        else history.credits = '--'; 
-        
-        // Extract SGPA data for each semester using line-by-line parsing
+        else history.credits = '--';
+
         history.sgpa = [];
         if (renderedText) {
             const lines = renderedText.split('\n');
@@ -554,7 +766,7 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
                 }
             }
         }
-        
+
         history.major = 'B.Tech';
         const branchMatch = seed.match(/Branch[:\s]+([^,]+)/i);
         if (branchMatch) {
@@ -568,7 +780,7 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
         }
 
         history.name = 'Student';
-        history.college = 'NSUT';
+        history.college = college;
         history.year = year.toString();
         try {
             const ldData = JSON.parse(ldJsonScript);
@@ -583,11 +795,11 @@ export async function fetchStudentDetailedProfile(rollNumber, preFetchedHtml = n
             if (nameMatch) history.name = nameMatch[1].trim();
         }
 
-        console.log(`[RESULT-HUB] Profile: name=${history.name}, cgpa=${history.cgpa}, rank=${history.universityRank}, major=${history.major}`);
+        console.log(`[RESULT-HUB] Fallback: name=${history.name}, cgpa=${history.cgpa}, rank=${history.universityRank}, major=${history.major}`);
 
         profile.success = true;
         profile.history = history;
-        profile.history.url = `https://www.resulthubdtu.com/NSUT/StudentProfile/${year}/${rollNumber}`;
+        profile.history.url = `https://www.resulthubdtu.com/${college}/StudentProfile/${year}/${rollNumber}`;
         return profile;
     } catch (e) {
         console.warn("[RESULT-HUB] Fast HTTP fetch failed:", e.message);

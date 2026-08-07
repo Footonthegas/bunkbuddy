@@ -1,13 +1,19 @@
 import { getSession, clearSession, saveSession, refreshData, getHolidays, fetchAcademicHistory } from './api.js';
 
-const WEEKDAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const WEEKDAY_ORDER = {
+  'Monday': 1, 'Mon': 1, 'M': 1,
+  'Tuesday': 2, 'Tue': 2, 'Tues': 2, 'Tu': 2,
+  'Wednesday': 3, 'Wed': 3, 'W': 3,
+  'Thursday': 4, 'Thur': 4, 'Thu': 4, 'Thurs': 4,
+  'Friday': 5, 'Fri': 5, 'F': 5,
+  'Saturday': 6, 'Sat': 6, 'Sa': 6,
+  'Sunday': 7, 'Sun': 7, 'Su': 7,
+};
 
 function sortWeekdays(days) {
   return [...days].sort((a, b) => {
-    const ia = WEEKDAY_ORDER.indexOf(a);
-    const ib = WEEKDAY_ORDER.indexOf(b);
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
+    const ia = WEEKDAY_ORDER[a] || 99;
+    const ib = WEEKDAY_ORDER[b] || 99;
     return ia - ib;
   });
 }

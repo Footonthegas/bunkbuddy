@@ -191,8 +191,10 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       rollNumber,
       data: normalized,
       history: null,
+      academicHistory: null,
       timings: {
-        total_ms: goJson.elapsed_ms || null,
+        total_ms: goJson.elapsed_ms || goJson._elapsed_ms || null,
+        time_to_first_byte_ms: goJson._time_to_first_byte_ms || null,
         phases: goJson._timings || [],
       },
       mode: 'go-scraper'
@@ -205,8 +207,10 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
     if (!loginFailed && isGoScraperAvailable()) {
       console.log(`[LOGIN] Falling back to Node.js scraper for ${rollNumber}...`);
+      const nodeStart = Date.now();
       try {
         const nodeResult = await scrapeWithNode(rollNumber, password, year, semester);
+        const nodeMs = Date.now() - nodeStart;
         if (nodeResult && nodeResult.status === 'success') {
           const normalizedNode = normalizeNodeResult(nodeResult);
           const sessionId = uuidv4();
@@ -233,7 +237,8 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
             rollNumber,
             data: normalizedNode,
             history: null,
-            mode: 'node-scraper'
+            mode: 'node-scraper',
+            timings: { total_ms: nodeMs, phases: [] }
           });
         }
       } catch (nodeErr) {
@@ -270,10 +275,12 @@ app.post('/api/academics/history', async (req, res) => {
   }
 
   try {
+    const rhStart = Date.now();
     const rh = await fetchResultHubNode(session.rollNumber);
+    const rhMs = Date.now() - rhStart;
     if (rh && rh.success && rh.history) {
       session.history = rh.history;
-      return res.json({ success: true, history: rh.history, cached: false });
+      return res.json({ success: true, history: rh.history, cached: false, timings: { resulthub_ms: rhMs } });
     }
   } catch (e) {
     console.error("ResultHub on-demand fetch failed:", e.message);
@@ -294,12 +301,14 @@ app.get('/api/academic-history/:rollNumber', async (req, res) => {
   }
 
   try {
+    const rhStart = Date.now();
     const rh = await fetchResultHubNode(rollNumber);
+    const rhMs = Date.now() - rhStart;
     if (rh && rh.success && rh.history) {
       if (session) {
         session.history = rh.history;
       }
-      return res.json({ success: true, history: rh.history, cached: false });
+      return res.json({ success: true, history: rh.history, cached: false, timings: { resulthub_ms: rhMs } });
     }
   } catch (e) {
     console.error("ResultHub fetch failed:", e.message);
@@ -345,7 +354,7 @@ app.post('/api/data/refresh', async (req, res) => {
       session.year = targetYear;
       session.semester = targetSem;
       console.log(`[REFRESH] ✅ Go scraper refreshed ${session.rollNumber} (${normalized.attendance.length} subjects)!`);
-      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, timings: { total_ms: goJson.elapsed_ms || null, phases: goJson._timings || [] }, mode: 'go-refresh' });
+      res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, timings: { total_ms: goJson.elapsed_ms || goJson._elapsed_ms || null, time_to_first_byte_ms: goJson._time_to_first_byte_ms || null, phases: goJson._timings || [] }, mode: 'go-refresh' });
       return;
     } catch (goErr) {
       if (goErr.message && goErr.message.includes('Invalid roll number or password')) {
@@ -355,8 +364,10 @@ app.post('/api/data/refresh', async (req, res) => {
 
       if (!refreshLoginFailed && isGoScraperAvailable()) {
         console.log(`[REFRESH] Falling back to Node.js scraper for ${session.rollNumber}...`);
+        const nodeStart = Date.now();
         try {
           const nodeResult = await scrapeWithNode(session.rollNumber, pwd, targetYear, targetSem);
+          const nodeMs = Date.now() - nodeStart;
           if (nodeResult && nodeResult.status === 'success') {
             const normalizedNode = normalizeNodeResult(nodeResult);
 
@@ -364,7 +375,7 @@ app.post('/api/data/refresh', async (req, res) => {
             session.year = targetYear;
             session.semester = targetSem;
             console.log(`[REFRESH] ✅ Node.js scraper refreshed ${session.rollNumber} (${normalizedNode.attendance.length} subjects)!`);
-            return res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'node-refresh' });
+            return res.json({ success: true, sessionId: req.body.sessionId, data: session.data, history: session.history, mode: 'node-refresh', timings: { total_ms: nodeMs, phases: [] } });
           }
         } catch (nodeErr) {
           console.error(`[REFRESH] ❌ Node.js scraper also failed for ${session.rollNumber}: ${nodeErr.message}`);
