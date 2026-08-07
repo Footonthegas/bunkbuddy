@@ -205,6 +205,10 @@ func findRegisteredCoursesLink(menuHTML string, base string) string {
 			score += 8
 		} else if strings.Contains(text, "registered courses") {
 			score += 5
+		} else if strings.Contains(text, "registered") {
+			score += 2
+		} else if strings.Contains(text, "courses") {
+			score += 1
 		}
 		if score > 0 && score > bestScore {
 			bestScore = score
@@ -214,6 +218,14 @@ func findRegisteredCoursesLink(menuHTML string, base string) string {
 
 	if bestURL == "" {
 		re := regexp.MustCompile(`(?i)href=['"]([^'"]+)['"][^>]*>.*?current.*?sem.*?course.*?registered`)
+		m := re.FindStringSubmatch(menuHTML)
+		if len(m) >= 2 {
+			bestURL = m[1]
+		}
+	}
+
+	if bestURL == "" {
+		re := regexp.MustCompile(`(?i)href=['"]([^'"]*(?:course|subject)[^'"]*)['"]`)
 		m := re.FindStringSubmatch(menuHTML)
 		if len(m) >= 2 {
 			bestURL = m[1]
@@ -256,11 +268,17 @@ func findTimetableLink(menuHTML string, base string) string {
 		if strings.Contains(text, "my") {
 			score += 1
 		}
+		if strings.Contains(text, "class schedule") || strings.Contains(text, "schedule") {
+			score += 4
+		}
 		if strings.Contains(hrefLower, "time") && strings.Contains(hrefLower, "table") {
 			score += 4
 		}
 		if strings.Contains(hrefLower, "timetable") {
 			score += 3
+		}
+		if strings.Contains(hrefLower, "schedule") {
+			score += 2
 		}
 		if strings.Contains(hrefLower, "plum_url.php") {
 			score += 1
@@ -273,7 +291,15 @@ func findTimetableLink(menuHTML string, base string) string {
 	})
 
 	if bestURL == "" {
-		re := regexp.MustCompile(`(?i)href=['"]([^'"]+)['"][^>]*>\s*(?:my\s*)?time\s*table\s*<`)
+		re := regexp.MustCompile(`(?i)href=['"]([^'"]+)['"][^>]*>\s*(?:my\s*)?(?:time\s*table|timetable|class\s*schedule|schedule)\s*<`)
+		m := re.FindStringSubmatch(menuHTML)
+		if len(m) >= 2 {
+			bestURL = m[1]
+		}
+	}
+
+	if bestURL == "" {
+		re := regexp.MustCompile(`(?i)href=['"]([^'"]*(?:timetable|time_table|schedule)[^'"]*)['"]`)
 		m := re.FindStringSubmatch(menuHTML)
 		if len(m) >= 2 {
 			bestURL = m[1]
@@ -657,7 +683,11 @@ func pickSubjectForSlot(rawCell string, registered []RegisteredCourse) string {
 				return c.Name
 			}
 		}
-		return ""
+		fallback := normalizeSubjectFromSlot(raw)
+		if fallback != "" {
+			return fallback
+		}
+		return raw
 	}
 
 	if len(matchedResults) == 1 {
@@ -724,26 +754,26 @@ func tryParseMatrixTable(rows *goquery.Selection, todayOnly bool, registered []R
 		if len(texts) < 2 {
 			continue
 		}
-		timeCount := 0
-		var times []string
-		for j, t := range texts {
-			if j == 0 {
-				times = append(times, "")
-				continue
+			timeCount := 0
+			var times []string
+			for j, t := range texts {
+				if j == 0 {
+					times = append(times, "")
+					continue
+				}
+				if looksLikeTimeLabel(t) {
+					times = append(times, formatSlotTime(t))
+					timeCount++
+				} else {
+					times = append(times, "")
+				}
 			}
-			if looksLikeTimeLabel(t) {
-				times = append(times, formatSlotTime(t))
-				timeCount++
-			} else {
-				times = append(times, "")
+			if timeCount >= 2 {
+				headerIndex = rowIdx
+				slotTimes = times
+				break
 			}
 		}
-		if timeCount >= 1 {
-			headerIndex = rowIdx
-			slotTimes = times
-			break
-		}
-	}
 
 	if headerIndex < 0 || len(slotTimes) == 0 {
 		return nil
@@ -903,11 +933,11 @@ func parseTimetableWeek(html string, registered []RegisteredCourse) map[string][
 					times = append(times, "")
 				}
 			}
-			if timeCount >= 1 {
-				headerIndex = rowIdx
-				slotTimes = times
-				break
-			}
+		if timeCount >= 2 {
+			headerIndex = rowIdx
+			slotTimes = times
+			break
+		}
 		}
 
 		if headerIndex < 0 || len(slotTimes) == 0 {
