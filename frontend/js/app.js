@@ -229,6 +229,7 @@ function renderSubjectCards() {
     const p = parseFloat(subj.percentage);
     const color = p >= 75 ? 'var(--accent-green)' : p >= 65 ? 'var(--accent-amber)' : 'var(--accent-red)';
     const nameTrunc = (subj.subject || '').length > 35 ? (subj.subject || '').substring(0, 35) + '...' : subj.subject;
+    const showCode = subj.code && subj.code !== subj.subject;
 
     const statusPhrase = subj.statusText === 'bunkable'
       ? `<div class="text-green" style="font-size: 1.1rem; font-weight: bold;">${subj.statusNumber} SAFE TO BUNK</div>`
@@ -242,7 +243,8 @@ function renderSubjectCards() {
 
     return `
       <div class="term-card">
-        <div style="font-weight: bold; font-size: 0.95rem; margin-bottom: 10px; line-height: 1.2; min-height: 2.2rem;">${escapeHtml(nameTrunc)}</div>
+        <div style="font-weight: bold; font-size: 0.95rem; margin-bottom: ${showCode ? '4px' : '10px'}; line-height: 1.2; min-height: 2.2rem;">${escapeHtml(nameTrunc)}</div>
+        ${showCode ? `<div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 6px;">${escapeHtml(subj.code)}</div>` : ''}
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
           <div style="flex: 1; min-width: 0;">
             ${statusPhrase}
@@ -291,6 +293,7 @@ function renderAttendance() {
             <div class="term-card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
               <div style="flex: 1; min-width: 140px;">
                 <div style="font-weight: 500; font-size: 0.95rem; color: #fff;">${escapeHtml(r.subject)}</div>
+                ${r.code && r.code !== r.subject ? `<div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 2px;">${escapeHtml(r.code)}</div>` : ''}
                 <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 2px;">${r.attended} present / ${r.absent} absent</div>
               </div>
               <div style="display: flex; align-items: center; gap: 12px;">

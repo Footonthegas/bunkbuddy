@@ -125,8 +125,11 @@ export function normalizeGoResult(goJson, semester = '1') {
   const timeline = goJson.timeline || {};
   const subjectNames = goJson.subject_names || {};
   const courses = goJson.courses || [];
-  const todayTimetable = goJson.timetable_today || [];
-  const weekTimetable = goJson.timetable_week || {};
+  const courseNameMap = {};
+  for (const c of courses) {
+    if (c.code && c.name) courseNameMap[c.code.toUpperCase()] = c.name;
+  }
+  const allNames = { ...subjectNames, ...courseNameMap };
 
   const attendance = Object.entries(attendanceMap).map(([code, counts]) => {
     const present = counts.present || 0;
@@ -146,7 +149,8 @@ export function normalizeGoResult(goJson, semester = '1') {
       }
     }
     return {
-      subject: subjectNames[code] || code,
+      code: code.toUpperCase(),
+      subject: allNames[code.toUpperCase()] || code,
       attended: String(present),
       absent: String(absent),
       total: String(total),
@@ -157,6 +161,9 @@ export function normalizeGoResult(goJson, semester = '1') {
   });
 
   const detailedAttendance = buildDetailedAttendance(attendanceMap, timeline, subjectNames, courses);
+
+  const todayTimetable = goJson.timetable_today || [];
+  const weekTimetable = goJson.timetable_week || {};
 
   const home = {
     profile: {
@@ -342,7 +349,8 @@ export function normalizeNodeResult(nodeJson) {
       }
     }
     return {
-      subject: subjectNames[a.code || a.subject] || a.subject,
+      code: (a.code || a.subject || '').toUpperCase(),
+      subject: subjectNames[a.code] || a.subject,
       attended: String(present),
       absent: String(absent),
       total: String(total),
