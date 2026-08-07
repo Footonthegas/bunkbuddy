@@ -587,45 +587,109 @@ function initTimetablePage() {
   const container = document.getElementById('timetableContainer');
   const todayBtn = document.getElementById('ttTodayBtn');
   const weekBtn = document.getElementById('ttWeekBtn');
+  const clockEl = document.getElementById('ttClock');
   if (!container) return;
 
   const today = (window.data && window.data.todayTimetable) || [];
   const week = (window.data && window.data.weekTimetable) || {};
 
+  function parseTimeRange(timeStr) {
+    const parts = timeStr.split('-');
+    if (parts.length !== 2) return null;
+    const parse = (s) => {
+      s = s.trim().toLowerCase();
+      let mer = 'am';
+      if (s.includes('pm')) { mer = 'pm'; s = s.replace('pm', ''); }
+      else if (s.includes('am')) { mer = 'am'; s = s.replace('am', ''); }
+      const tp = s.split(':');
+      let h = parseInt(tp[0]) || 0;
+      let m = tp.length > 1 ? parseInt(tp[1]) || 0 : 0;
+      if (mer === 'pm' && h < 12) h += 12;
+      if (mer === 'am' && h === 12) h = 0;
+      return h * 60 + m;
+    };
+    return { start: parse(parts[0]), end: parse(parts[1]) };
+  }
+
+  function isCurrentClass(timeStr) {
+    const range = parseTimeRange(timeStr);
+    if (!range) return false;
+    const now = new Date();
+    const current = now.getHours() * 60 + now.getMinutes();
+    return current >= range.start && current < range.end;
+  }
+
+  function updateClock() {
+    if (!clockEl) return;
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    clockEl.textContent = `${h}:${m}`;
+  }
+
   let mode = 'today';
+  let renderInterval = null;
+
   function render() {
     if (mode === 'today') {
       if (today.length === 0) {
         container.innerHTML = '<div class="term-alert info">No classes scheduled for today.</div>';
         return;
       }
-      container.innerHTML = today.map(slot => `
-        <div class="term-card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;">
-          <div>
-            <div style="font-weight: bold; color: #fff;">${escapeHtml(slot.subject)}</div>
+      container.innerHTML = today.map(slot => {
+        const isActive = isCurrentClass(slot.time);
+        const highlightStyle = isActive
+          ? 'border: 1px solid var(--accent-green); box-shadow: 0 0 12px rgba(51,255,51,0.15);'
+          : '';
+        const activeLabel = isActive ? '<span class="text-green" style="font-size: 0.75rem; margin-left: 8px;">● LIVE</span>' : '';
+        const roomLine = slot.room ? `<div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 2px;">Room: ${escapeHtml(slot.room)}</div>` : '';
+        return `
+          <div class="term-card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; ${highlightStyle}">
+            <div>
+              <div style="font-weight: bold; color: #fff;">${escapeHtml(slot.subject)}${activeLabel}</div>
+              ${roomLine}
+            </div>
+            <div style="color: var(--accent-cyan); font-weight: bold; font-size: 0.9rem;">${escapeHtml(slot.time)}</div>
           </div>
-          <div style="color: var(--accent-cyan); font-weight: bold; font-size: 0.9rem;">${escapeHtml(slot.time)}</div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     } else {
       const days = sortWeekdays(Object.keys(week));
       if (days.length === 0) {
         container.innerHTML = '<div class="term-alert info">No weekly timetable data available.</div>';
         return;
       }
-      container.innerHTML = days.map(day => `
-        <div style="margin-bottom: 16px;">
-          <div style="font-size: 0.85rem; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">${escapeHtml(day)}</div>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            ${week[day].map(slot => `
-              <div class="term-card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px;">
-                <div style="font-weight: 500; color: #fff;">${escapeHtml(slot.subject)}</div>
-                <div style="color: var(--text-dim); font-size: 0.85rem;">${escapeHtml(slot.time)}</div>
+      const now = new Date();
+      const currentDay = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][now.getDay()];
+      container.innerHTML = days.map(day => {
+        const isToday = day === currentDay;
+        const dayLabel = isToday ? `${escapeHtml(day)} <span class="text-green" style="font-size:0.75rem;">● TODAY</span>` : escapeHtml(day);
+        const slotsHtml = week[day].map(slot => {
+          const isActive = isCurrentClass(slot.time);
+          const highlightStyle = isActive
+            ? 'border: 1px solid var(--accent-green); box-shadow: 0 0 12px rgba(51,255,51,0.15);'
+            : '';
+          const activeLabel = isActive ? '<span class="text-green" style="font-size: 0.75rem; margin-left: 8px;">● LIVE</span>' : '';
+          const roomLine = slot.room ? `<div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 2px;">Room: ${escapeHtml(slot.room)}</div>` : '';
+          return `
+            <div class="term-card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; ${highlightStyle}">
+              <div>
+                <div style="font-weight: 500; color: #fff;">${escapeHtml(slot.subject)}${activeLabel}</div>
+                ${roomLine}
               </div>
-            `).join('')}
+              <div style="color: var(--text-dim); font-size: 0.85rem;">${escapeHtml(slot.time)}</div>
+            </div>
+          `;
+        }).join('');
+        return `
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 0.85rem; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">${dayLabel}</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              ${slotsHtml}
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
   }
 
@@ -648,6 +712,12 @@ function initTimetablePage() {
 
   if (todayBtn) todayBtn.classList.add('active');
   render();
+  updateClock();
+  if (renderInterval) clearInterval(renderInterval);
+  renderInterval = setInterval(() => {
+    updateClock();
+    render();
+  }, 30000);
 }
 
 // ─── Legal Pages ───

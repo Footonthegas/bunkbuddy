@@ -204,6 +204,7 @@ export function normalizeGoResult(goJson, semester = '1') {
   const mappedTodayTimetable = todayTimetable.map(slot => ({
     time: slot.time,
     subject: mapSubject(slot.subject),
+    room: slot.room || '',
   }));
 
   const mappedWeekTimetable = {};
@@ -219,6 +220,7 @@ export function normalizeGoResult(goJson, semester = '1') {
       mappedWeekTimetable[d] = weekLookup[d].map(slot => ({
         time: slot.time,
         subject: mapSubject(slot.subject),
+        room: slot.room || '',
       }));
     } else {
       mappedWeekTimetable[d] = [];
@@ -371,6 +373,7 @@ export function normalizeNodeResult(nodeJson) {
   const mappedToday = (data.timetable_today || []).map(slot => ({
     time: slot.time,
     subject: mapSubject(slot.subject),
+    room: slot.room || '',
   }));
 
   const mappedWeek = {};
@@ -399,6 +402,7 @@ export function normalizeNodeResult(nodeJson) {
       mappedWeek[d] = weekLookup[d].map(slot => ({
         time: slot.time,
         subject: mapSubject(slot.subject),
+        room: slot.room || '',
       }));
     } else {
       mappedWeek[d] = [];

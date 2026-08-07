@@ -6,9 +6,15 @@
   <p style="color: var(--text-dim); margin: 4px 0 0 0; font-size: 0.9rem;">Today's classes and weekly schedule</p>
 </div>
 
-<div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
-  <button class="term-btn" id="ttTodayBtn" style="flex: 1; min-width: 120px;">[ TODAY ]</button>
-  <button class="term-btn" id="ttWeekBtn" style="flex: 1; min-width: 120px;">[ WEEK ]</button>
+<div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <button class="term-btn" id="ttTodayBtn" style="flex: 1; min-width: 120px;">[ TODAY ]</button>
+    <button class="term-btn" id="ttWeekBtn" style="flex: 1; min-width: 120px;">[ WEEK ]</button>
+  </div>
+  <div style="font-size: 0.85rem; color: var(--text-dim);">
+    <i class="ph ph-clock" style="margin-right: 4px;"></i>
+    <span id="ttClock">--:--</span>
+  </div>
 </div>
 
 <div id="timetableContainer">

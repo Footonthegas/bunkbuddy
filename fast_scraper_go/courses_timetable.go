@@ -24,6 +24,7 @@ type RegisteredCourse struct {
 type TimetableSlot struct {
 	Time    string `json:"time"`
 	Subject string `json:"subject"`
+	Room    string `json:"room,omitempty"`
 }
 
 func normalizeGroupLabel(raw string) string {
@@ -37,6 +38,29 @@ func normalizeGroupLabel(raw string) string {
 		return "grp-" + m[1]
 	}
 	return strings.TrimSpace(raw)
+}
+
+func extractRoom(raw string) string {
+	patterns := []string{
+		`(?i)Room\s*[:\-]?\s*([A-Z]?\d{2,})`,
+		`(?i)Rm\s*[:\-]?\s*([A-Z]?\d{2,})`,
+		`(?i)Room\s*[:\-]?\s*([A-Z]{1,2}\d{1,3})`,
+	}
+	for _, p := range patterns {
+		m := regexp.MustCompile(p).FindStringSubmatch(raw)
+		if len(m) >= 2 {
+			return m[1]
+		}
+	}
+	return ""
+}
+
+func hasBatchGroupSectionMarkers(text string) bool {
+	lower := strings.ToLower(text)
+	hasBatch := regexp.MustCompile(`(?i)bat\s*[:\- ]\s*\d+`).MatchString(lower)
+	hasGroup := regexp.MustCompile(`(?i)grp\s*[- ]?\s*\d+`).MatchString(lower)
+	hasSection := regexp.MustCompile(`(?i)sec\s*[:\- ]\s*\d+`).MatchString(lower)
+	return hasBatch || hasGroup || hasSection
 }
 
 func parseRegisteredCourses(html string) []RegisteredCourse {
@@ -529,92 +553,77 @@ func pickSubjectForSlot(rawCell string, registered []RegisteredCourse) string {
 		return ""
 	}
 
-	compressed := regexp.MustCompile(`(?i)(?:sem\s*[:\-]?\s*\d+.*?bat\s*[:\-]?\s*\d+)`).ReplaceAllString(raw, " ")
-	compressed = regexp.MustCompile(`\s{2,}`).ReplaceAllString(compressed, " ")
-	compressed = strings.TrimSpace(compressed)
-
-	rawLower := strings.ToLower(raw)
-	for _, c := range registered {
-		if c.Name != "" && rawLower == strings.ToLower(c.Name) {
-			return c.Name
-		}
-		if c.Name != "" && strings.Contains(rawLower, strings.ToLower(c.Name)) {
-			return c.Name
-		}
+	type matchResult struct {
+		course RegisteredCourse
+		byCode bool
+		disq   bool
+		isLab  bool
 	}
+	var results []matchResult
+	seen := make(map[string]bool)
 
-	searchText := compressed
-	codeMatches := regexp.MustCompile(`\b([A-Z]{2,}[A-Z0-9]*\d{2,})\b`).FindAllString(searchText, -1)
+	codeMatches := regexp.MustCompile(`\b([A-Z]{2,}[A-Z0-9]*\d{2,})\b`).FindAllString(raw, -1)
 	if len(codeMatches) == 0 {
-		codeMatches = regexp.MustCompile(`([A-Z]{2,}[A-Z0-9]*\d{2,})`).FindAllString(searchText, -1)
+		codeMatches = regexp.MustCompile(`([A-Z]{2,}[A-Z0-9]*\d{2,})`).FindAllString(raw, -1)
 	}
 	regMap := make(map[string]RegisteredCourse)
 	for _, c := range registered {
 		regMap[c.Code] = c
 	}
-	var uniqueCodes []string
-	seen := make(map[string]bool)
-	for _, c := range codeMatches {
-		cu := strings.ToUpper(c)
+	for _, cm := range codeMatches {
+		cu := strings.ToUpper(cm)
 		if regMap[cu] != (RegisteredCourse{}) && !seen[cu] {
-			uniqueCodes = append(uniqueCodes, cu)
+			results = append(results, matchResult{course: regMap[cu], byCode: true})
 			seen[cu] = true
 		}
 	}
 
-	if len(uniqueCodes) == 0 {
+	if len(results) == 0 {
 		for _, c := range registered {
-			if c.Name != "" && strings.Contains(rawLower, strings.ToLower(c.Name)) {
-				return c.Name
+			if c.Name != "" && strings.Contains(lower, strings.ToLower(c.Name)) {
+				results = append(results, matchResult{course: c, byCode: false})
 			}
 		}
-		return normalizeSubjectFromSlot(raw)
 	}
 
-	type matchResult struct {
-		code     string
-		name     string
-		isLab    bool
-		disq     bool
+	if len(results) == 0 {
+		return ""
 	}
-	var results []matchResult
 
-	for _, code := range uniqueCodes {
-		reg := regMap[code]
+	var matchedResults []matchResult
+	for i := range results {
+		r := &results[i]
+		r.disq = false
+		r.isLab = false
+
 		slotText := raw
-		disq := false
-		isLab := false
-		matched := false
-
-		allBatchHits := regexp.MustCompile(`(?i)`+regexp.QuoteMeta(code)+`[^\n]*?bat\s*[:\- ]\s*(\d+)`).FindAllStringSubmatch(slotText, -1)
-		allGroupHits := regexp.MustCompile(`(?i)`+regexp.QuoteMeta(code)+`[^\n]*?grp\s*[- ]?\s*(\d+)`).FindAllStringSubmatch(slotText, -1)
-		secHit := regexp.MustCompile(`(?i)`+regexp.QuoteMeta(code)+`[^\n]*?sec\s*[:\- ]\s*(\d+)`).FindStringSubmatch(slotText)
+		allBatchHits := regexp.MustCompile(`(?i)bat\s*[:\- ]\s*(\d+)`).FindAllStringSubmatch(slotText, -1)
+		allGroupHits := regexp.MustCompile(`(?i)grp\s*[- ]?\s*(\d+)`).FindAllStringSubmatch(slotText, -1)
+		secHit := regexp.MustCompile(`(?i)sec\s*[:\- ]\s*(\d+)`).FindStringSubmatch(slotText)
 
 		hasAnyBatchMarker := len(allBatchHits) > 0
 		hasAnyGroupMarker := len(allGroupHits) > 0
 		hasAnySectionMarker := len(secHit) >= 2
 
-		if reg.Batch != "" {
+		if r.course.Batch != "" {
 			if hasAnyBatchMarker {
 				found := false
 				for _, bh := range allBatchHits {
-					if len(bh) >= 2 && strings.TrimSpace(bh[1]) == reg.Batch {
+					if len(bh) >= 2 && strings.TrimSpace(bh[1]) == r.course.Batch {
 						found = true
 						break
 					}
 				}
-				if found {
-					matched = true
-				} else {
-					disq = true
+				if !found {
+					r.disq = true
 				}
 			}
 		} else if hasAnyBatchMarker {
-			disq = true
+			r.disq = true
 		}
 
-		if !disq && reg.Group != "" {
-			grpNum := strings.Split(reg.Group, "-")
+		if !r.disq && r.course.Group != "" {
+			grpNum := strings.Split(r.course.Group, "-")
 			last := grpNum[len(grpNum)-1]
 			if hasAnyGroupMarker {
 				found := false
@@ -625,87 +634,51 @@ func pickSubjectForSlot(rawCell string, registered []RegisteredCourse) string {
 					}
 				}
 				if found {
-					matched = true
 					if regexp.MustCompile(`(?i)grp\s*[- ]?\s*\d+`).MatchString(slotText) {
-						isLab = true
+						r.isLab = true
 					}
 				} else {
-					disq = true
+					r.disq = true
 				}
 			}
-		} else if !disq && hasAnyGroupMarker {
-			disq = true
+		} else if !r.disq && hasAnyGroupMarker {
+			r.disq = true
 		}
 
-		if !disq && !matched && reg.Section != "" {
+		if !r.disq && r.course.Section != "" {
 			if hasAnyBatchMarker || hasAnyGroupMarker {
-				disq = true
+				r.disq = true
 			} else if hasAnySectionMarker {
-				if strings.TrimSpace(secHit[1]) != reg.Section {
-					disq = true
-				} else {
-					matched = true
+				if strings.TrimSpace(secHit[1]) != r.course.Section {
+					r.disq = true
 				}
 			}
 		}
 
-		if !disq && !matched {
-			if hasAnyBatchMarker || hasAnyGroupMarker || hasAnySectionMarker {
-				disq = true
-			} else {
-				matched = true
-			}
-		}
-
-		name := reg.Name
-		if name == "" {
-			name = code
-		}
-
-		results = append(results, matchResult{
-			code:  code,
-			name:  name,
-			isLab: isLab,
-			disq:  disq,
-		})
-	}
-
-	var matchedResults []matchResult
-	for _, r := range results {
 		if !r.disq {
-			matchedResults = append(matchedResults, r)
+			matchedResults = append(matchedResults, *r)
 		}
 	}
 
 	if len(matchedResults) == 0 {
-		for _, c := range registered {
-			if c.Name != "" && strings.Contains(rawLower, strings.ToLower(c.Name)) {
-				return c.Name
-			}
-		}
-		fallback := normalizeSubjectFromSlot(raw)
-		if fallback != "" {
-			return fallback
-		}
-		return raw
+		return ""
 	}
 
 	if len(matchedResults) == 1 {
 		r := matchedResults[0]
 		if r.isLab {
-			return r.name + " Lab"
+			return r.course.Name + " Lab"
 		}
-		return r.name
+		return r.course.Name
 	}
 
 	for _, r := range matchedResults {
 		if r.isLab {
-			return r.name + " Lab"
+			return r.course.Name + " Lab"
 		}
 	}
 
-	first := matchedResults[0]
-	return first.name
+	return matchedResults[0].course.Name
 }
 
 func parseTimetable(html string, todayOnly bool, registered []RegisteredCourse) []TimetableSlot {
@@ -815,7 +788,8 @@ func tryParseMatrixTable(rows *goquery.Selection, todayOnly bool, registered []R
 			if subject == "" {
 				continue
 			}
-			slots = append(slots, TimetableSlot{Time: timeLabel, Subject: subject})
+			room := extractRoom(rawSubject)
+			slots = append(slots, TimetableSlot{Time: timeLabel, Subject: subject, Room: room})
 		}
 		if todayOnly && len(slots) > 0 {
 			return slots
@@ -884,7 +858,8 @@ func tryParseRowwiseTable(rows *goquery.Selection, todayOnly bool, registered []
 		if subject == "" {
 			continue
 		}
-		slots = append(slots, TimetableSlot{Time: timeLabel, Subject: subject})
+		room := extractRoom(texts[subjIdx])
+		slots = append(slots, TimetableSlot{Time: timeLabel, Subject: subject, Room: room})
 	}
 	return slots
 }
@@ -982,7 +957,8 @@ func parseTimetableWeek(html string, registered []RegisteredCourse) map[string][
 				if subject == "" {
 					continue
 				}
-				daySlots = append(daySlots, TimetableSlot{Time: timeLabel, Subject: subject})
+				room := extractRoom(rawSubject)
+				daySlots = append(daySlots, TimetableSlot{Time: timeLabel, Subject: subject, Room: room})
 			}
 			if len(daySlots) > 0 {
 				result[dayLabel] = daySlots
