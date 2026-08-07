@@ -699,6 +699,24 @@ func pickSubjectForSlot(rawCell string, registered []RegisteredCourse) string {
 				return c.Name
 			}
 		}
+
+		hasBatch := regexp.MustCompile(`(?i)bat\s*[:\- ]\s*\d+`).MatchString(raw)
+		hasGroup := regexp.MustCompile(`(?i)grp\s*[- ]?\s*\d+`).MatchString(raw)
+		hasSection := regexp.MustCompile(`(?i)sec\s*[:\- ]\s*\d+`).MatchString(raw)
+
+		if hasBatch || hasGroup || hasSection {
+			userHasMarker := false
+			for _, c := range registered {
+				if c.Batch != "" || c.Group != "" || c.Section != "" {
+					userHasMarker = true
+					break
+				}
+			}
+			if userHasMarker {
+				return ""
+			}
+		}
+
 		fallback := normalizeSubjectFromSlot(raw)
 		if fallback != "" {
 			return fallback
